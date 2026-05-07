@@ -16,7 +16,7 @@ from app.auth import SECRET_KEY, ALGORITHM, oauth2_scheme
 router = APIRouter()
 
 @router.get("/", response_model=List[ProductoResponse])
-def read_productos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_productos(skip: int = 0, limit: int = 10000, db: Session = Depends(get_db)):
     return get_productos(db, skip, limit)
 
 @router.get("/export-xlsx")
@@ -78,15 +78,23 @@ async def import_productos(
     wb = load_workbook(BytesIO(content))
     ws = wb.active
     
-    resultados = {"creados": 0, "actualizados": 0, "errores": []}
+    resultados = {"creados": 0, "actualizados": 0, "errores": [], "procesados": 0}
     
     for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not row or all(v is None for v in row):
+            continue
+        if len(row) < 10:
+            resultados["errores"].append(f"Fila {row_num}: Solo {len(row)} columnas (se esperan 10)")
+            continue
+        
         try:
             codigo, categoria_nombre, descripcion, marca, peso, precio, stock_inicial, stock_actual, stock_minimo, estado = row
             
             if not codigo or not descripcion or not marca:
                 resultados["errores"].append(f"Fila {row_num}: Faltan campos obligatorios (codigo, descripcion, marca)")
                 continue
+            
+            resultados["procesados"] += 1
             
             categoria = None
             if categoria_nombre:

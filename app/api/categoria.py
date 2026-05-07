@@ -8,7 +8,7 @@ from app.crud.categoria import get_categorias, get_categoria, create_categoria, 
 router = APIRouter()
 
 @router.get("/", response_model=List[CategoriaResponse])
-def read_categorias(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_categorias(skip: int = 0, limit: int = 10000, db: Session = Depends(get_db)):
     return get_categorias(db, skip, limit)
 
 @router.get("/{categoria_id}", response_model=CategoriaResponse)

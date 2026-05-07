@@ -5,7 +5,7 @@ from app.schemas.producto import ProductoCreate, ProductoUpdate
 def get_producto(db: Session, producto_id: int):
     return db.query(Producto).options(joinedload(Producto.usuario)).filter(Producto.id == producto_id).first()
 
-def get_productos(db: Session, skip: int = 0, limit: int = 100):
+def get_productos(db: Session, skip: int = 0, limit: int = 10000):
     return db.query(Producto).options(joinedload(Producto.usuario)).offset(skip).limit(limit).all()
 
 def get_producto_by_codigo(db: Session, codigo: str):

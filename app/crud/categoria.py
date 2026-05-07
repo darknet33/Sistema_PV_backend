@@ -5,7 +5,7 @@ from app.schemas.categoria import CategoriaCreate
 def get_categoria(db: Session, categoria_id: int):
     return db.query(Categoria).filter(Categoria.id == categoria_id).first()
 
-def get_categorias(db: Session, skip: int = 0, limit: int = 100):
+def get_categorias(db: Session, skip: int = 0, limit: int = 10000):
     return db.query(Categoria).offset(skip).limit(limit).all()
 
 def create_categoria(db: Session, categoria: CategoriaCreate):
