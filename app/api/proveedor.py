@@ -35,3 +35,13 @@ def delete_proveedor_endpoint(proveedor_id: int, db: Session = Depends(get_db)):
     if not db_proveedor:
         raise HTTPException(status_code=404, detail="Proveedor not found")
     return {"message": "Proveedor deleted"}
+
+@router.patch("/{proveedor_id}/toggle-activo", response_model=ProveedorResponse)
+def toggle_proveedor_activo(proveedor_id: int, db: Session = Depends(get_db)):
+    db_proveedor = get_proveedor(db, proveedor_id)
+    if not db_proveedor:
+        raise HTTPException(status_code=404, detail="Proveedor not found")
+    db_proveedor.activo = not db_proveedor.activo
+    db.commit()
+    db.refresh(db_proveedor)
+    return db_proveedor

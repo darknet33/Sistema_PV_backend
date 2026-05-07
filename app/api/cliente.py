@@ -35,3 +35,13 @@ def delete_cliente_endpoint(cliente_id: int, db: Session = Depends(get_db)):
     if not db_cliente:
         raise HTTPException(status_code=404, detail="Cliente not found")
     return {"message": "Cliente deleted"}
+
+@router.patch("/{cliente_id}/toggle-activo", response_model=ClienteResponse)
+def toggle_cliente_activo(cliente_id: int, db: Session = Depends(get_db)):
+    db_cliente = get_cliente(db, cliente_id)
+    if not db_cliente:
+        raise HTTPException(status_code=404, detail="Cliente not found")
+    db_cliente.activo = not db_cliente.activo
+    db.commit()
+    db.refresh(db_cliente)
+    return db_cliente

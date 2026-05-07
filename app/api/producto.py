@@ -45,3 +45,13 @@ def delete_producto_endpoint(producto_id: int, db: Session = Depends(get_db)):
     if not db_producto:
         raise HTTPException(status_code=404, detail="Producto not found")
     return {"message": "Producto deleted"}
+
+@router.patch("/{producto_id}/toggle-activo", response_model=ProductoResponse)
+def toggle_producto_activo(producto_id: int, db: Session = Depends(get_db)):
+    db_producto = get_producto(db, producto_id)
+    if not db_producto:
+        raise HTTPException(status_code=404, detail="Producto not found")
+    db_producto.activo = not db_producto.activo
+    db.commit()
+    db.refresh(db_producto)
+    return db_producto
