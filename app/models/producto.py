@@ -22,3 +22,9 @@ class Producto(BaseModel):
     usuario = relationship("Usuario", back_populates="productos")
     compras_detalle = relationship("CompraDetalle", back_populates="producto")
     ventas_detalle = relationship("VentaDetalle", back_populates="producto")
+    
+    @property
+    def usuario_nombre(self):
+        if self.usuario:
+            return f"{self.usuario.nombres} {self.usuario.apellidos}"
+        return ""

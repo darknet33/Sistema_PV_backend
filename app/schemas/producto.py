@@ -1,4 +1,4 @@
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 from decimal import Decimal
 from typing import Optional
 from datetime import datetime
@@ -32,7 +32,7 @@ class ProductoUpdate(BaseModel):
 class ProductoResponse(BaseModel):
     id: int
     codigo: str
-    categoria_id: int
+    categoria_id: Optional[int] = None
     descripcion: str
     marca: str
     precio: Decimal = 0
@@ -41,24 +41,10 @@ class ProductoResponse(BaseModel):
     stock_inicial: int
     stock_actual: int
     stock_minimo: int
-    usuario_id: int
+    usuario_id: Optional[int] = None
     activo: bool
     fecha_registro: datetime
     fecha_actualizado: Optional[datetime] = None
     usuario_nombre: str = ""
     
-    class Config:
-        from_attributes = True
-    
-    @model_validator(mode='before')
-    @classmethod
-    def set_usuario_nombre(cls, data):
-        if hasattr(data, 'usuario') and data.usuario:
-            data.usuario_nombre = f"{data.usuario.nombres} {data.usuario.apellidos}"
-        elif isinstance(data, dict) and 'usuario' in data and data['usuario']:
-            usuario = data['usuario']
-            if hasattr(usuario, 'nombres'):
-                data['usuario_nombre'] = f"{usuario.nombres} {usuario.apellidos}"
-            else:
-                data['usuario_nombre'] = f"{usuario.get('nombres', '')} {usuario.get('apellidos', '')}"
-        return data
+    model_config = {"from_attributes": True}
