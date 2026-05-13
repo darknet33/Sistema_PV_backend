@@ -8,6 +8,17 @@ class CompraDetalleCreate(BaseModel):
     cantidad: int
     costo: Decimal
 
+class CompraDetalleResponse(BaseModel):
+    id: int
+    producto_id: int
+    producto_nombre: str
+    producto_codigo: str
+    cantidad: int
+    costo: Decimal
+
+    class Config:
+        from_attributes = True
+
 class CompraBase(BaseModel):
     fecha: datetime
     proveedor_id: int
@@ -19,12 +30,29 @@ class CompraBase(BaseModel):
 class CompraCreate(CompraBase):
     pass
 
-class CompraResponse(CompraBase):
+class CompraUpdate(BaseModel):
+    fecha: Optional[datetime] = None
+    proveedor_id: Optional[int] = None
+    comprobante_id: Optional[int] = None
+    num_comprobante: Optional[str] = None
+    estado_id: Optional[int] = None
+    detalles: Optional[List[CompraDetalleCreate]] = None
+
+class CompraResponse(BaseModel):
     id: int
+    fecha: datetime
+    proveedor_id: int
+    proveedor_nombre: str
+    comprobante_id: int
+    comprobante_nombre: str
+    num_comprobante: Optional[str] = None
+    estado_id: int
+    estado_nombre: str
     total: Decimal
     activo: bool
     usuario_id: int
     fecha_registro: datetime
-    
+    detalles: List[CompraDetalleResponse]
+
     class Config:
         from_attributes = True

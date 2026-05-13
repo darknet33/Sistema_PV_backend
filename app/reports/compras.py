@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
 import io
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -11,6 +11,8 @@ def generar_reporte_compras(db: Session, fecha_inicio: datetime, fecha_fin: date
     from app.models.proveedor import Proveedor
     from app.models.comprobante import Comprobante
     from app.models.estado import Estado
+    
+    fecha_fin = fecha_fin.replace(hour=23, minute=59, second=59)
     
     compras = db.query(Compra, Proveedor, Comprobante, Estado)\
         .join(Proveedor, Compra.proveedor_id == Proveedor.id)\
