@@ -83,7 +83,7 @@ def get_compra(db: Session, compra_id: int):
     return _build_response(db, compra)
 
 def get_compras(db: Session, skip: int = 0, limit: int = 100):
-    compras = db.query(Compra).order_by(Compra.fecha.desc()).offset(skip).limit(limit).all()
+    compras = db.query(Compra).order_by(Compra.id.desc()).offset(skip).limit(limit).all()
     return [_build_response(db, c) for c in compras]
 
 def create_compra(db: Session, compra: CompraCreate, usuario_id: int):
