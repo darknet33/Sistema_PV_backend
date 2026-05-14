@@ -176,10 +176,41 @@ def update_compra(db: Session, compra_id: int, compra: CompraUpdate):
     db.refresh(db_compra)
     return _build_response(db, db_compra)
 
+def _get_estado_anulado(db: Session):
+    estado = db.query(Estado).filter(Estado.nombre == "ANULADO").first()
+    if not estado:
+        estado = Estado(nombre="ANULADO")
+        db.add(estado)
+        db.flush()
+    return estado
+
+def anular_compra(db: Session, compra_id: int):
+    db_compra = db.query(Compra).filter(Compra.id == compra_id).first()
+    if not db_compra:
+        return None
+
+    estado_anulado = _get_estado_anulado(db)
+    if db_compra.estado_id == estado_anulado.id:
+        raise HTTPException(status_code=400, detail="La compra ya está anulada")
+
+    detalles = db.query(CompraDetalle).filter(CompraDetalle.compra_id == compra_id).all()
+    for d in detalles:
+        _update_stock(db, d.producto_id, d.cantidad, sumar=False)
+
+    db_compra.estado_id = estado_anulado.id
+    db_compra.activo = 0
+    db.commit()
+    db.refresh(db_compra)
+    return _build_response(db, db_compra)
+
 def delete_compra(db: Session, compra_id: int):
     db_compra = db.query(Compra).filter(Compra.id == compra_id).first()
     if not db_compra:
         return None
+
+    estado_anulado = _get_estado_anulado(db)
+    if db_compra.estado_id != estado_anulado.id:
+        raise HTTPException(status_code=400, detail="Solo se puede eliminar compras anuladas")
 
     detalles = db.query(CompraDetalle).filter(CompraDetalle.compra_id == compra_id).all()
     for d in detalles:

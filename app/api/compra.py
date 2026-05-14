@@ -4,7 +4,7 @@ from typing import List
 from fastapi.responses import StreamingResponse
 from app.database import get_db
 from app.schemas.compra import CompraCreate, CompraUpdate, CompraResponse
-from app.crud.compra import get_compras, get_compra, create_compra, update_compra, delete_compra
+from app.crud.compra import get_compras, get_compra, create_compra, update_compra, delete_compra, anular_compra
 
 router = APIRouter()
 
@@ -29,6 +29,13 @@ def update_compra_endpoint(compra_id: int, compra: CompraUpdate, db: Session = D
     if not db_compra:
         raise HTTPException(status_code=404, detail="Compra not found")
     return db_compra
+
+@router.put("/{compra_id}/anular", response_model=CompraResponse)
+def anular_compra_endpoint(compra_id: int, db: Session = Depends(get_db)):
+    result = anular_compra(db, compra_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Compra not found")
+    return result
 
 @router.delete("/{compra_id}")
 def delete_compra_endpoint(compra_id: int, db: Session = Depends(get_db)):
