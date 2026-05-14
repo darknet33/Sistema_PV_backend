@@ -7,6 +7,7 @@ from app.models.producto import Producto
 from app.models.proveedor import Proveedor
 from app.models.comprobante import Comprobante
 from app.models.estado import Estado
+from app.models.categoria import Categoria
 from app.schemas.compra import CompraCreate, CompraUpdate
 
 def _validate_foreign_keys(db: Session, proveedor_id: int, comprobante_id: int, estado_id: int, detalles: list):
@@ -44,11 +45,16 @@ def _build_response(db: Session, compra: Compra):
     detalles_response = []
     for d in detalles:
         prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
+        cat_nombre = ""
+        if prod:
+            cat = db.query(Categoria).filter(Categoria.id == prod.categoria_id).first()
+            cat_nombre = cat.nombre if cat else ""
         detalles_response.append({
             "id": d.id,
             "producto_id": d.producto_id,
             "producto_nombre": prod.descripcion if prod else "",
             "producto_codigo": prod.codigo if prod else "",
+            "producto_categoria": cat_nombre,
             "cantidad": d.cantidad,
             "costo": d.costo,
         })

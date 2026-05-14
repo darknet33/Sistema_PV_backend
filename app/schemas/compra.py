@@ -13,6 +13,7 @@ class CompraDetalleResponse(BaseModel):
     producto_id: int
     producto_nombre: str
     producto_codigo: str
+    producto_categoria: str
     cantidad: int
     costo: Decimal
 

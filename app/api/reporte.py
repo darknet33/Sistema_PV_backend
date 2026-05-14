@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from fastapi.responses import StreamingResponse
 from app.database import get_db
 from datetime import datetime
+from typing import Optional
 import io
 
 router = APIRouter()
@@ -34,10 +35,10 @@ def reporte_ventas_pdf(fecha_inicio: datetime, fecha_fin: datetime, db: Session 
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/compras/pdf")
-def reporte_compras_pdf(fecha_inicio: datetime, fecha_fin: datetime, db: Session = Depends(get_db)):
+def reporte_compras_pdf(fecha_inicio: datetime, fecha_fin: datetime, proveedor_text: Optional[str] = Query(None), estado_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
     try:
         from app.reports.compras import generar_reporte_compras
-        buffer = generar_reporte_compras(db, fecha_inicio, fecha_fin)
+        buffer = generar_reporte_compras(db, fecha_inicio, fecha_fin, proveedor_text, estado_id)
         return StreamingResponse(
             buffer,
             media_type='application/pdf',

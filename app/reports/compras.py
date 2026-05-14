@@ -1,12 +1,13 @@
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+from typing import Optional
 import io
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 
-def generar_reporte_compras(db: Session, fecha_inicio: datetime, fecha_fin: datetime):
+def generar_reporte_compras(db: Session, fecha_inicio: datetime, fecha_fin: datetime, proveedor_text: Optional[str] = None, estado_id: Optional[int] = None):
     from app.models.compra import Compra
     from app.models.proveedor import Proveedor
     from app.models.comprobante import Comprobante
@@ -14,12 +15,18 @@ def generar_reporte_compras(db: Session, fecha_inicio: datetime, fecha_fin: date
     
     fecha_fin = fecha_fin.replace(hour=23, minute=59, second=59)
     
-    compras = db.query(Compra, Proveedor, Comprobante, Estado)\
+    query = db.query(Compra, Proveedor, Comprobante, Estado)\
         .join(Proveedor, Compra.proveedor_id == Proveedor.id)\
         .join(Comprobante, Compra.comprobante_id == Comprobante.id)\
         .join(Estado, Compra.estado_id == Estado.id)\
-        .filter(Compra.fecha.between(fecha_inicio, fecha_fin))\
-        .order_by(Compra.fecha.desc()).all()
+        .filter(Compra.fecha.between(fecha_inicio, fecha_fin))
+    
+    if proveedor_text:
+        query = query.filter(Proveedor.nombre.ilike(f'%{proveedor_text}%'))
+    if estado_id:
+        query = query.filter(Compra.estado_id == estado_id)
+    
+    compras = query.order_by(Compra.fecha.desc()).all()
     
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)

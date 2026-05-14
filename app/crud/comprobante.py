@@ -1,5 +1,8 @@
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
 from app.models.comprobante import Comprobante
+from app.models.compra import Compra
+from app.models.venta import Venta
 from app.schemas.comprobante import ComprobanteCreate
 
 def get_comprobante(db: Session, comprobante_id: int):
@@ -26,7 +29,12 @@ def update_comprobante(db: Session, comprobante_id: int, comprobante: Comprobant
 
 def delete_comprobante(db: Session, comprobante_id: int):
     db_comprobante = get_comprobante(db, comprobante_id)
-    if db_comprobante:
-        db.delete(db_comprobante)
-        db.commit()
+    if not db_comprobante:
+        return None
+    en_compras = db.query(Compra).filter(Compra.comprobante_id == comprobante_id).first()
+    en_ventas = db.query(Venta).filter(Venta.comprobante_id == comprobante_id).first()
+    if en_compras or en_ventas:
+        raise HTTPException(status_code=400, detail="No se puede eliminar porque tiene compras o ventas asociadas")
+    db.delete(db_comprobante)
+    db.commit()
     return db_comprobante

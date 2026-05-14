@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
@@ -8,8 +8,8 @@ from app.crud.proveedor import get_proveedores, get_proveedor, create_proveedor,
 router = APIRouter()
 
 @router.get("/", response_model=List[ProveedorResponse])
-def read_proveedores(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return get_proveedores(db, skip, limit)
+def read_proveedores(skip: int = 0, limit: int = 100, solo_activos: bool = Query(False), db: Session = Depends(get_db)):
+    return get_proveedores(db, skip, limit, solo_activos)
 
 @router.get("/{proveedor_id}", response_model=ProveedorResponse)
 def read_proveedor(proveedor_id: int, db: Session = Depends(get_db)):

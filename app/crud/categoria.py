@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
 from app.models.categoria import Categoria
+from app.models.producto import Producto
 from app.schemas.categoria import CategoriaCreate
 
 def get_categoria(db: Session, categoria_id: int):
@@ -25,7 +27,11 @@ def update_categoria(db: Session, categoria_id: int, categoria: CategoriaCreate)
 
 def delete_categoria(db: Session, categoria_id: int):
     db_categoria = get_categoria(db, categoria_id)
-    if db_categoria:
-        db.delete(db_categoria)
-        db.commit()
+    if not db_categoria:
+        return None
+    tiene_productos = db.query(Producto).filter(Producto.categoria_id == categoria_id).first()
+    if tiene_productos:
+        raise HTTPException(status_code=400, detail="No se puede eliminar porque tiene productos asociados")
+    db.delete(db_categoria)
+    db.commit()
     return db_categoria

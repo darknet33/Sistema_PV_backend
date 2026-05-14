@@ -13,6 +13,7 @@ def generar_comprobante_compra(db: Session, compra_id: int):
     from app.models.comprobante import Comprobante
     from app.models.estado import Estado
     from app.models.producto import Producto
+    from app.models.categoria import Categoria
 
     compra = db.query(Compra).filter(Compra.id == compra_id).first()
     if not compra:
@@ -52,26 +53,31 @@ def generar_comprobante_compra(db: Session, compra_id: int):
     styles.add(ParagraphStyle(name='CellWrap', parent=styles['Normal'], fontSize=9, leading=12, wordWrap='CJK'))
     styles.add(ParagraphStyle(name='CellCenter', parent=styles['Normal'], fontSize=9, leading=12, alignment=1))
     styles.add(ParagraphStyle(name='CellRight', parent=styles['Normal'], fontSize=9, leading=12, alignment=2))
-
-    header_style = styles['Normal']
+    styles.add(ParagraphStyle(name='HeaderCell', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.white, fontName='Helvetica-Bold', alignment=1))
 
     data = [
         [
-            Paragraph('Código', styles['Normal']),
-            Paragraph('Producto', styles['Normal']),
-            Paragraph('Cantidad', styles['Normal']),
-            Paragraph('Costo (Bs.)', styles['Normal']),
-            Paragraph('Subtotal (Bs.)', styles['Normal']),
+            Paragraph('Código', styles['HeaderCell']),
+            Paragraph('Producto', styles['HeaderCell']),
+            Paragraph('Cant.', styles['HeaderCell']),
+            Paragraph('Costo (Bs.)', styles['HeaderCell']),
+            Paragraph('Subtotal (Bs.)', styles['HeaderCell']),
         ]
     ]
     total = 0
     for d in detalles:
         prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
+        cat_nombre = ''
+        if prod:
+            cat = db.query(Categoria).filter(Categoria.id == prod.categoria_id).first()
+            cat_nombre = cat.nombre if cat else ''
+        prod_nombre = f"{cat_nombre} - {prod.descripcion}" if cat_nombre and prod else (prod.descripcion if prod else '-')
         subtotal = d.cantidad * d.costo
         total += subtotal
         data.append([
             Paragraph(prod.codigo if prod else '-', styles['CellCenter']),
-            Paragraph(prod.descripcion if prod else '-', styles['CellWrap']),
+            Paragraph(prod_nombre, styles['CellWrap']),
+            Paragraph(prod.marca if prod else '-', styles['CellWrap']),
             Paragraph(str(d.cantidad), styles['CellCenter']),
             Paragraph(f"{d.costo:.2f}", styles['CellRight']),
             Paragraph(f"{subtotal:.2f}", styles['CellRight']),

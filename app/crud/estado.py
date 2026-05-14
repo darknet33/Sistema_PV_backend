@@ -1,5 +1,8 @@
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
 from app.models.estado import Estado
+from app.models.compra import Compra
+from app.models.venta import Venta
 from app.schemas.estado import EstadoCreate
 
 def get_estado(db: Session, estado_id: int):
@@ -25,7 +28,12 @@ def update_estado(db: Session, estado_id: int, estado: EstadoCreate):
 
 def delete_estado(db: Session, estado_id: int):
     db_estado = get_estado(db, estado_id)
-    if db_estado:
-        db.delete(db_estado)
-        db.commit()
+    if not db_estado:
+        return None
+    en_compras = db.query(Compra).filter(Compra.estado_id == estado_id).first()
+    en_ventas = db.query(Venta).filter(Venta.estado_id == estado_id).first()
+    if en_compras or en_ventas:
+        raise HTTPException(status_code=400, detail="No se puede eliminar porque tiene compras o ventas asociadas")
+    db.delete(db_estado)
+    db.commit()
     return db_estado

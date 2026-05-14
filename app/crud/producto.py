@@ -1,5 +1,8 @@
 from sqlalchemy.orm import Session, joinedload
+from fastapi import HTTPException
 from app.models.producto import Producto
+from app.models.compra_detalle import CompraDetalle
+from app.models.venta_detalle import VentaDetalle
 from app.schemas.producto import ProductoCreate, ProductoUpdate
 
 def get_producto(db: Session, producto_id: int):
@@ -41,7 +44,15 @@ def update_producto(db: Session, producto_id: int, producto: ProductoUpdate):
 
 def delete_producto(db: Session, producto_id: int):
     db_producto = get_producto(db, producto_id)
-    if db_producto:
-        db.delete(db_producto)
+    if not db_producto:
+        return None
+    en_compras = db.query(CompraDetalle).filter(CompraDetalle.producto_id == producto_id).first()
+    en_ventas = db.query(VentaDetalle).filter(VentaDetalle.producto_id == producto_id).first()
+    if en_compras or en_ventas:
+        db_producto.activo = False
         db.commit()
+        db.refresh(db_producto)
+        return db_producto
+    db.delete(db_producto)
+    db.commit()
     return db_producto
