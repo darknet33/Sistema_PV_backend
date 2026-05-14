@@ -29,7 +29,7 @@ class CompraBase(BaseModel):
     detalles: List[CompraDetalleCreate]
 
 class CompraCreate(CompraBase):
-    pass
+    automatico: bool = True
 
 class CompraUpdate(BaseModel):
     fecha: Optional[datetime] = None

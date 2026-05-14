@@ -91,9 +91,12 @@ def create_compra(db: Session, compra: CompraCreate, usuario_id: int):
 
     total = sum(detalle.cantidad * detalle.costo for detalle in compra.detalles)
 
-    comprobante = db.query(Comprobante).filter(Comprobante.id == compra.comprobante_id).with_for_update().first()
-    num_comprobante = compra.num_comprobante or str(comprobante.numero).zfill(8)
-    comprobante.numero += 1
+    if getattr(compra, 'automatico', True):
+        comprobante = db.query(Comprobante).filter(Comprobante.id == compra.comprobante_id).with_for_update().first()
+        num_comprobante = compra.num_comprobante or str(comprobante.numero).zfill(8)
+        comprobante.numero += 1
+    else:
+        num_comprobante = compra.num_comprobante or ''
 
     fecha = compra.fecha if isinstance(compra.fecha, datetime) else datetime.combine(compra.fecha, datetime.min.time())
     fecha = datetime.combine(fecha.date(), datetime.now().time())

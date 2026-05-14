@@ -57,6 +57,7 @@ def generar_comprobante_compra(db: Session, compra_id: int):
 
     data = [
         [
+            Paragraph('#', styles['HeaderCell']),
             Paragraph('Código', styles['HeaderCell']),
             Paragraph('Producto', styles['HeaderCell']),
             Paragraph('Cant.', styles['HeaderCell']),
@@ -65,7 +66,7 @@ def generar_comprobante_compra(db: Session, compra_id: int):
         ]
     ]
     total = 0
-    for d in detalles:
+    for i, d in enumerate(detalles, start=1):
         prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
         cat_nombre = ''
         if prod:
@@ -75,23 +76,24 @@ def generar_comprobante_compra(db: Session, compra_id: int):
         subtotal = d.cantidad * d.costo
         total += subtotal
         data.append([
+            Paragraph(str(i), styles['CellCenter']),
             Paragraph(prod.codigo if prod else '-', styles['CellCenter']),
             Paragraph(prod_nombre, styles['CellWrap']),
-            Paragraph(prod.marca if prod else '-', styles['CellWrap']),
             Paragraph(str(d.cantidad), styles['CellCenter']),
             Paragraph(f"{d.costo:.2f}", styles['CellRight']),
             Paragraph(f"{subtotal:.2f}", styles['CellRight']),
         ])
 
     data.append([
+        Paragraph('', styles['CellCenter']),
         Paragraph('', styles['CellWrap']),
         Paragraph('', styles['CellWrap']),
         Paragraph('', styles['CellCenter']),
         Paragraph('TOTAL:', styles['CellRight']),
-        Paragraph(f"{total:.2f}", styles['CellRight']),
+        Paragraph(f"Bs. {total:.2f}", styles['CellRight']),
     ])
 
-    table = Table(data, colWidths=[0.9*inch, 2.8*inch, 0.7*inch, 1.0*inch, 1.0*inch])
+    table = Table(data, colWidths=[0.4*inch, 0.8*inch, 2.6*inch, 0.6*inch, 1.0*inch, 1.0*inch])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#404040')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
