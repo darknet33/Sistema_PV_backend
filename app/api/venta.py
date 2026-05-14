@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
+from fastapi.responses import StreamingResponse
 from app.database import get_db
-from app.schemas.venta import VentaCreate, VentaResponse
-from app.crud.venta import get_ventas, get_venta, create_venta, update_venta, delete_venta
+from app.schemas.venta import VentaCreate, VentaUpdate, VentaResponse
+from app.crud.venta import get_ventas, get_venta, create_venta, update_venta, anular_venta, delete_venta
+from datetime import datetime
 
 router = APIRouter()
 
@@ -23,15 +25,39 @@ def create_venta_endpoint(venta: VentaCreate, db: Session = Depends(get_db)):
     return create_venta(db, venta, usuario_id=1)
 
 @router.put("/{venta_id}", response_model=VentaResponse)
-def update_venta_endpoint(venta_id: int, venta: VentaCreate, db: Session = Depends(get_db)):
+def update_venta_endpoint(venta_id: int, venta: VentaUpdate, db: Session = Depends(get_db)):
     db_venta = update_venta(db, venta_id, venta)
+    if not db_venta:
+        raise HTTPException(status_code=404, detail="Venta not found")
+    return db_venta
+
+@router.put("/{venta_id}/anular", response_model=VentaResponse)
+def anular_venta_endpoint(venta_id: int, db: Session = Depends(get_db)):
+    db_venta = anular_venta(db, venta_id)
     if not db_venta:
         raise HTTPException(status_code=404, detail="Venta not found")
     return db_venta
 
 @router.delete("/{venta_id}")
 def delete_venta_endpoint(venta_id: int, db: Session = Depends(get_db)):
-    db_venta = delete_venta(db, venta_id)
-    if not db_venta:
+    result = delete_venta(db, venta_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Venta not found")
-    return {"message": "Venta deleted"}
+    return result
+
+@router.get("/{venta_id}/pdf")
+def descargar_pdf_venta(venta_id: int, db: Session = Depends(get_db)):
+    try:
+        from app.reports.venta_single import generar_comprobante_venta
+        buffer = generar_comprobante_venta(db, venta_id)
+        if buffer is None:
+            raise HTTPException(status_code=404, detail="Venta no encontrada")
+        return StreamingResponse(
+            buffer,
+            media_type='application/pdf',
+            headers={'Content-Disposition': f'attachment; filename=venta_{venta_id}.pdf'}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

@@ -9,6 +9,19 @@ class VentaDetalleCreate(BaseModel):
     precio: Decimal
     utilidad: Decimal = 0
 
+class VentaDetalleResponse(BaseModel):
+    id: int
+    producto_id: int
+    producto_nombre: str
+    producto_codigo: str
+    producto_categoria: str
+    cantidad: int
+    precio: Decimal
+    utilidad: Decimal
+
+    class Config:
+        from_attributes = True
+
 class VentaBase(BaseModel):
     fecha: datetime
     cliente_id: int
@@ -20,14 +33,35 @@ class VentaBase(BaseModel):
     detalles: List[VentaDetalleCreate]
 
 class VentaCreate(VentaBase):
-    pass
+    automatico: bool = True
 
-class VentaResponse(VentaBase):
+class VentaUpdate(BaseModel):
+    fecha: Optional[datetime] = None
+    cliente_id: Optional[int] = None
+    comprobante_id: Optional[int] = None
+    num_comprobante: Optional[str] = None
+    estado_id: Optional[int] = None
+    impuesto: Optional[Decimal] = None
+    descuento: Optional[Decimal] = None
+    detalles: Optional[List[VentaDetalleCreate]] = None
+
+class VentaResponse(BaseModel):
     id: int
+    fecha: datetime
+    cliente_id: int
+    cliente_nombre: str
+    comprobante_id: int
+    comprobante_nombre: str
+    num_comprobante: Optional[str] = None
+    estado_id: int
+    estado_nombre: str
     total: Decimal
+    impuesto: Decimal
+    descuento: Decimal
     activo: bool
     usuario_id: int
     fecha_registro: datetime
-    
+    detalles: List[VentaDetalleResponse]
+
     class Config:
         from_attributes = True

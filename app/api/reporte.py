@@ -22,10 +22,10 @@ def get_kardex(producto_id: int, fecha_inicio: datetime, fecha_fin: datetime, db
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/ventas/pdf")
-def reporte_ventas_pdf(fecha_inicio: datetime, fecha_fin: datetime, db: Session = Depends(get_db)):
+def reporte_ventas_pdf(fecha_inicio: datetime, fecha_fin: datetime, cliente_text: Optional[str] = Query(None), estado_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
     try:
         from app.reports.ventas import generar_reporte_ventas
-        buffer = generar_reporte_ventas(db, fecha_inicio, fecha_fin)
+        buffer = generar_reporte_ventas(db, fecha_inicio, fecha_fin, cliente_text, estado_id)
         return StreamingResponse(
             buffer,
             media_type='application/pdf',
