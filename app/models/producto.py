@@ -26,5 +26,5 @@ class Producto(BaseModel):
     @property
     def usuario_nombre(self):
         if self.usuario:
-            return f"{self.usuario.nombres} {self.usuario.apellidos}"
+            return self.usuario.username
         return ""

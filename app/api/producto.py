@@ -7,7 +7,7 @@ from openpyxl import Workbook, load_workbook
 from jose import jwt
 from app.database import get_db
 from app.schemas.producto import ProductoCreate, ProductoUpdate, ProductoResponse
-from app.crud.producto import get_productos, get_producto, get_producto_by_codigo, create_producto, update_producto, delete_producto
+from app.crud.producto import get_productos, get_producto, get_producto_by_codigo, create_producto, update_producto, delete_producto, delete_productos_batch as crud_delete_batch, delete_all_productos as crud_delete_all
 from app.models.producto import Producto
 from app.models.categoria import Categoria
 from app.models.usuario import Usuario
@@ -27,19 +27,20 @@ def export_productos(db: Session = Depends(get_db)):
     ws = wb.active
     ws.title = "Productos"
     
-    headers = ["Código", "Categoría", "Descripción", "Marca", "Peso", "Precio", "Stock Inicial", "Stock Actual", "Stock Mínimo", "Estado"]
+    headers = ["ÏD", "Código", "Categoría", "Descripción", "Marca", "Costo Bs.", "Utilidad Bs.", "Peso Kg", "Stock Inicial", "Stock Mínimo", "Estado"]
     ws.append(headers)
     
     for p in productos:
         ws.append([
+            p.id,
             p.codigo,
             p.categoria.nombre if p.categoria else "",
             p.descripcion,
             p.marca,
-            float(p.peso),
             float(p.precio),
+            float(p.utilidad),
+            float(p.peso),
             p.stock_inicial,
-            p.stock_actual,
             p.stock_minimo,
             "Activo" if p.activo else "Inactivo",
         ])
@@ -83,12 +84,12 @@ async def import_productos(
     for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not row or all(v is None for v in row):
             continue
-        if len(row) < 10:
-            resultados["errores"].append(f"Fila {row_num}: Solo {len(row)} columnas (se esperan 10)")
+        if len(row) < 11:
+            resultados["errores"].append(f"Fila {row_num}: Solo {len(row)} columnas (se esperan 11)")
             continue
         
         try:
-            codigo, categoria_nombre, descripcion, marca, peso, precio, stock_inicial, stock_actual, stock_minimo, estado = row
+            _, codigo, categoria_nombre, descripcion, marca, costo_bs, utilidad_bs, peso_kg, stock_inicial, stock_minimo, estado = row
             
             if not codigo or not descripcion or not marca:
                 resultados["errores"].append(f"Fila {row_num}: Faltan campos obligatorios (codigo, descripcion, marca)")
@@ -111,10 +112,9 @@ async def import_productos(
                 producto_existente.categoria_id = categoria.id if categoria else producto_existente.categoria_id
                 producto_existente.descripcion = str(descripcion)
                 producto_existente.marca = str(marca)
-                producto_existente.peso = float(peso) if peso else 0
-                producto_existente.precio = float(precio) if precio else 0
-                producto_existente.stock_inicial = int(stock_inicial) if stock_inicial else 0
-                producto_existente.stock_actual = int(stock_actual) if stock_actual else 0
+                producto_existente.precio = float(costo_bs) if costo_bs else 0
+                producto_existente.utilidad = float(utilidad_bs) if utilidad_bs else 0
+                producto_existente.peso = float(peso_kg) if peso_kg else 0
                 producto_existente.stock_minimo = int(stock_minimo) if stock_minimo else 0
                 if estado:
                     producto_existente.activo = str(estado).strip().lower() == "activo"
@@ -126,10 +126,11 @@ async def import_productos(
                     categoria_id=categoria.id if categoria else None,
                     descripcion=str(descripcion),
                     marca=str(marca),
-                    peso=float(peso) if peso else 0,
-                    precio=float(precio) if precio else 0,
+                    precio=float(costo_bs) if costo_bs else 0,
+                    utilidad=float(utilidad_bs) if utilidad_bs else 0,
+                    peso=float(peso_kg) if peso_kg else 0,
                     stock_inicial=int(stock_inicial) if stock_inicial else 0,
-                    stock_actual=int(stock_actual) if stock_actual else 0,
+                    stock_actual=int(stock_inicial) if stock_inicial else 0,
                     stock_minimo=int(stock_minimo) if stock_minimo else 0,
                     activo=str(estado).strip().lower() == "activo" if estado else True,
                     usuario_id=usuario_id,
@@ -144,18 +145,16 @@ async def import_productos(
     return resultados
 
 @router.post("/delete-batch")
-def delete_productos_batch(ids: List[int], db: Session = Depends(get_db)):
+def delete_productos_batch_endpoint(ids: List[int], db: Session = Depends(get_db)):
     if not ids:
         raise HTTPException(status_code=400, detail="No se proporcionaron IDs")
-    count = db.query(Producto).filter(Producto.id.in_(ids)).delete(synchronize_session=False)
-    db.commit()
-    return {"message": f"{count} productos eliminados", "count": count}
+    count = crud_delete_batch(db, ids)
+    return {"message": f"{count} productos procesados", "count": count}
 
 @router.delete("/all")
-def delete_all_productos(db: Session = Depends(get_db)):
-    count = db.query(Producto).delete(synchronize_session=False)
-    db.commit()
-    return {"message": f"Todos los productos eliminados ({count})", "count": count}
+def delete_all_productos_endpoint(db: Session = Depends(get_db)):
+    count = crud_delete_all(db)
+    return {"message": f"Todos los productos procesados ({count})", "count": count}
 
 @router.get("/codigo/{codigo}", response_model=ProductoResponse)
 def read_producto_by_codigo(codigo: str, db: Session = Depends(get_db)):

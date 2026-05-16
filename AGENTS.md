@@ -60,6 +60,7 @@ All routers use prefix `/api` (defined in `app/api/__init__.py`).
 ### Compose Pattern (Compra/Venta CRUD)
 - Master entity with inline detail rows
 - `_validate_foreign_keys(db, ...)` validates all FKs exist before create/update
+- `_validar_stock_para_venta(db, detalles, old_detalles=None)` — validates stock before creating/updating a Venta; raises HTTP 400 if any product has insufficient stock. For updates, `old_detalles` stock is accounted for (restored first).
 - `_update_stock(db, producto_id, cantidad, sumar)` — sumar=True adds, sumar=False subtracts
 - `_build_response(db, entity)` builds dict with nested nombres (proveedor_nombre, cliente_nombre, etc.) and categoria
 - `num_comprobante` auto-generated: 8-digit zero-padded from `Comprobante.numero` with `with_for_update` lock; `automatico: bool` controls behavior; Manual mode does NOT increment `Comprobante.numero`
@@ -74,7 +75,11 @@ All routers use prefix `/api` (defined in `app/api/__init__.py`).
 
 ### Soft-Delete Pattern
 - Entities with `activo` field (Proveedor, Producto): set `activo=False` if has related records
-- Entities without `activo` (Comprobante, Estado, Categoria): raise HTTP 400 if has related records
+  - **Individual delete** (`DELETE /productos/{id}`): checks relations; soft-delete if has, hard-delete otherwise
+  - **Batch delete** (`POST /productos/delete-batch`): same per-product logic as individual
+  - **Delete all** (`DELETE /productos/all`): same per-product logic — soft-deletes those with relations, hard-deletes those without
+- Entities without `activo` (Categoria, Comprobante, Estado): raise HTTP 400 if has related records
+  - **Delete all** for Categoria (`DELETE /categorias/all`): hard-deletes categories without products, skips those with products (reports which were omitted)
 
 ### PDF Reports
 - Reportlab with `SimpleDocTemplate`, `Table`, `Paragraph` with `wordWrap='CJK'`
@@ -87,6 +92,8 @@ All routers use prefix `/api` (defined in `app/api/__init__.py`).
 ### Excel
 - `GET /api/productos/export-xlsx` — descarga `productos.xlsx`
 - `POST /api/productos/import-xlsx` — importa desde archivo Excel
+- **Columnas**: `ÏD`, `Código`, `Categoría`, `Descripción`, `Marca`, `Costo Bs.`, `Utilidad Bs.`, `Peso Kg`, `Stock Inicial`, `Stock Mínimo`, `Estado`
+- `Costo Bs.` se mapea a `precio` en la BD; `Stock Actual` no se importa (se gestiona automáticamente, arranca en 0 para nuevos productos)
 
 ### Error Handling
 - FastAPI HTTPException with descriptive `detail`
@@ -102,6 +109,7 @@ All routers use prefix `/api` (defined in `app/api/__init__.py`).
 - **User ID**: Hardcoded as `1` in create endpoints (JWT auth pending full migration)
 - **Compra/Venta ordering**: By `id DESC` (not by fecha)
 - **Estado "ANULADO"**: Created automatically if missing; searched by name in uppercase
+- **Usuario**: Producto, Compra y Venta responses incluyen `usuario_username` (username del usuario que registró)
 - **Compra PDF columns**: `#`, Código, Producto (Categoría - Descripción), Cant., Costo (Bs.), Subtotal (Bs.)
 - **Venta PDF columns**: `#`, Código, Producto (Categoría - Descripción), Cant., Precio (Bs.), Subtotal (Bs.) + SUBTOTAL, IMPUESTO%, DESCUENTO%, TOTAL
 
@@ -116,6 +124,7 @@ All routers use prefix `/api` (defined in `app/api/__init__.py`).
 - Ventas: Full CRUD with anular, PDF (single + range), soft-delete protection, impuesto/descuento
 - Reports: Kardex PDF, Ventas PDF, Compras PDF
 - Excel import/export for Productos
+- Productos soft-delete: individual, batch, and delete-all all use `_tiene_relaciones()` helper to decide soft vs hard delete
 
 ### Common Tasks
 - Adding new entity: Create model → schema → CRUD → API → register in `__init__.py`

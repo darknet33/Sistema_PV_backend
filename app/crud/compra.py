@@ -8,6 +8,7 @@ from app.models.proveedor import Proveedor
 from app.models.comprobante import Comprobante
 from app.models.estado import Estado
 from app.models.categoria import Categoria
+from app.models.usuario import Usuario
 from app.schemas.compra import CompraCreate, CompraUpdate
 
 def _validate_foreign_keys(db: Session, proveedor_id: int, comprobante_id: int, estado_id: int, detalles: list):
@@ -59,6 +60,8 @@ def _build_response(db: Session, compra: Compra):
             "costo": d.costo,
         })
 
+    usuario = db.query(Usuario).filter(Usuario.id == compra.usuario_id).first()
+
     return {
         "id": compra.id,
         "fecha": compra.fecha,
@@ -72,6 +75,7 @@ def _build_response(db: Session, compra: Compra):
         "total": compra.total or 0,
         "activo": bool(compra.activo),
         "usuario_id": compra.usuario_id,
+        "usuario_username": usuario.username if usuario else "",
         "fecha_registro": compra.fecha_registro,
         "detalles": detalles_response,
     }

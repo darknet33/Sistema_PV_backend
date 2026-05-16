@@ -60,6 +60,7 @@ class VentaResponse(BaseModel):
     descuento: Decimal
     activo: bool
     usuario_id: int
+    usuario_username: str = ""
     fecha_registro: datetime
     detalles: List[VentaDetalleResponse]
 

@@ -92,8 +92,8 @@ Sistema_PV_backend/
 | `/api/usuarios` | CRUD usuarios |
 | `/api/roles` | CRUD roles |
 | `/api/modulos` | CRUD módulos |
-| `/api/categorias` | CRUD categorías |
-| `/api/productos` | CRUD + import/export Excel |
+| `/api/categorias` | CRUD + delete-all (elimina solo las que no tienen productos asociados) |
+| `/api/productos` | CRUD + import/export Excel (11 columnas: ÏD, Código, Categoría, Descripción, Marca, Costo Bs., Utilidad Bs., Peso Kg, Stock Inicial, Stock Mínimo, Estado) + soft-delete (individual, batch, all) |
 | `/api/proveedores` | CRUD + soft-delete |
 | `/api/clientes` | CRUD clientes |
 | `/api/comprobantes` | CRUD comprobantes |
@@ -110,5 +110,6 @@ Sistema_PV_backend/
 - **Decimales**: Pydantic envía como string
 - **N° Comprobante**: 8 dígitos, auto-generado con opción Manual
 - **Anular**: revierte stock, requiere estado ANULADO para eliminar
-- **Soft-Delete**: Proveedor/Producto usan `activo=False`; otros rechazan DELETE con 400
+- **Soft-Delete**: Proveedor/Producto usan `activo=False` si tienen relaciones; otros rechazan DELETE con 400. Batch y Delete-All también respetan esta regla.
+- **Stock**: Validación de stock al crear/editar ventas — no permite vender más del stock disponible (cuenta con stock restaurado en ediciones)
 - **PDF**: Reportlab con `wordWrap='CJK'`, formato `Categoría - Descripción`

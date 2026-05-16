@@ -8,6 +8,7 @@ from app.models.cliente import Cliente
 from app.models.comprobante import Comprobante
 from app.models.estado import Estado
 from app.models.categoria import Categoria
+from app.models.usuario import Usuario
 from app.schemas.venta import VentaCreate, VentaUpdate
 
 def _validate_foreign_keys(db: Session, cliente_id: int, comprobante_id: int, estado_id: int, detalles: list):
@@ -27,6 +28,26 @@ def _validate_foreign_keys(db: Session, cliente_id: int, comprobante_id: int, es
         producto = db.query(Producto).filter(Producto.id == detalle.producto_id).first()
         if not producto:
             raise HTTPException(status_code=400, detail=f"Producto {detalle.producto_id} no existe")
+
+def _validar_stock_para_venta(db: Session, detalles: list, old_detalles: list = None):
+    old_map = {}
+    if old_detalles:
+        for old in old_detalles:
+            old_map[old.producto_id] = old_map.get(old.producto_id, 0) + old.cantidad
+
+    for detalle in detalles:
+        producto = db.query(Producto).filter(Producto.id == detalle.producto_id).first()
+        if not producto:
+            raise HTTPException(status_code=400, detail=f"Producto {detalle.producto_id} no existe")
+
+        stock_disponible = (producto.stock_actual or 0) + old_map.get(detalle.producto_id, 0)
+
+        if stock_disponible < detalle.cantidad:
+            nombre = producto.descripcion or producto.codigo
+            raise HTTPException(
+                status_code=400,
+                detail=f"Stock insuficiente para '{nombre}': disponible {stock_disponible}, solicitado {detalle.cantidad}"
+            )
 
 def _update_stock(db: Session, producto_id: int, cantidad: int, sumar: bool):
     producto = db.query(Producto).filter(Producto.id == producto_id).first()
@@ -60,6 +81,8 @@ def _build_response(db: Session, venta: Venta):
             "utilidad": d.utilidad,
         })
 
+    usuario = db.query(Usuario).filter(Usuario.id == venta.usuario_id).first()
+
     return {
         "id": venta.id,
         "fecha": venta.fecha,
@@ -75,6 +98,7 @@ def _build_response(db: Session, venta: Venta):
         "descuento": venta.descuento or 0,
         "activo": bool(venta.activo),
         "usuario_id": venta.usuario_id,
+        "usuario_username": usuario.username if usuario else "",
         "fecha_registro": venta.fecha_registro,
         "detalles": detalles_response,
     }
@@ -91,6 +115,7 @@ def get_ventas(db: Session, skip: int = 0, limit: int = 100):
 
 def create_venta(db: Session, venta: VentaCreate, usuario_id: int):
     _validate_foreign_keys(db, venta.cliente_id, venta.comprobante_id, venta.estado_id, venta.detalles)
+    _validar_stock_para_venta(db, venta.detalles)
 
     subtotal = sum(d.cantidad * d.precio for d in venta.detalles)
     total = subtotal + (subtotal * (venta.impuesto or 0) / 100) - (subtotal * (venta.descuento or 0) / 100)
@@ -166,6 +191,7 @@ def update_venta(db: Session, venta_id: int, venta: VentaUpdate):
 
     if detalles_data is not None:
         old_detalles = db.query(VentaDetalle).filter(VentaDetalle.venta_id == venta_id).all()
+        _validar_stock_para_venta(db, detalles_data, old_detalles)
         for old_d in old_detalles:
             _update_stock(db, old_d.producto_id, old_d.cantidad, sumar=True)
         db.query(VentaDetalle).filter(VentaDetalle.venta_id == venta_id).delete()

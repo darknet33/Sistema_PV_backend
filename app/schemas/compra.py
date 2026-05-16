@@ -52,6 +52,7 @@ class CompraResponse(BaseModel):
     total: Decimal
     activo: bool
     usuario_id: int
+    usuario_username: str = ""
     fecha_registro: datetime
     detalles: List[CompraDetalleResponse]
 

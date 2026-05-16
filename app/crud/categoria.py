@@ -35,3 +35,17 @@ def delete_categoria(db: Session, categoria_id: int):
     db.delete(db_categoria)
     db.commit()
     return db_categoria
+
+def delete_all_categorias(db: Session):
+    categorias = db.query(Categoria).all()
+    eliminadas = 0
+    omitidas = []
+    for cat in categorias:
+        tiene_productos = db.query(Producto).filter(Producto.categoria_id == cat.id).first()
+        if tiene_productos:
+            omitidas.append(cat.nombre)
+        else:
+            db.delete(cat)
+            eliminadas += 1
+    db.commit()
+    return {"eliminadas": eliminadas, "omitidas": omitidas}
