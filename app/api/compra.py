@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from app.database import get_db
 from app.schemas.compra import CompraCreate, CompraUpdate, CompraResponse
 from app.crud.compra import get_compras, get_compra, create_compra, update_compra, delete_compra, anular_compra
+from app.ws import broadcast_multiple_sync
 
 router = APIRouter()
 
@@ -21,13 +22,16 @@ def read_compra(compra_id: int, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=CompraResponse)
 def create_compra_endpoint(compra: CompraCreate, db: Session = Depends(get_db)):
-    return create_compra(db, compra, usuario_id=1)
+    result = create_compra(db, compra, usuario_id=1)
+    broadcast_multiple_sync(["compras", "dashboard", "reportes"], {"type": "created", "room": "compras"})
+    return result
 
 @router.put("/{compra_id}", response_model=CompraResponse)
 def update_compra_endpoint(compra_id: int, compra: CompraUpdate, db: Session = Depends(get_db)):
     db_compra = update_compra(db, compra_id, compra)
     if not db_compra:
         raise HTTPException(status_code=404, detail="Compra not found")
+    broadcast_multiple_sync(["compras", "dashboard", "reportes"], {"type": "updated", "room": "compras"})
     return db_compra
 
 @router.put("/{compra_id}/anular", response_model=CompraResponse)
@@ -35,6 +39,7 @@ def anular_compra_endpoint(compra_id: int, db: Session = Depends(get_db)):
     result = anular_compra(db, compra_id)
     if not result:
         raise HTTPException(status_code=404, detail="Compra not found")
+    broadcast_multiple_sync(["compras", "dashboard", "reportes"], {"type": "updated", "room": "compras"})
     return result
 
 @router.delete("/{compra_id}")
@@ -42,6 +47,7 @@ def delete_compra_endpoint(compra_id: int, db: Session = Depends(get_db)):
     result = delete_compra(db, compra_id)
     if not result:
         raise HTTPException(status_code=404, detail="Compra not found")
+    broadcast_multiple_sync(["compras", "dashboard", "reportes"], {"type": "deleted", "room": "compras"})
     return {"message": "Compra deleted"}
 
 @router.get("/{compra_id}/pdf")

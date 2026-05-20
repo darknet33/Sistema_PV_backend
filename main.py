@@ -1,8 +1,10 @@
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import api_router
 from app.database import init_db, Base
 from app.models import Base
+from app.ws import init_loop
 
 init_db()
 
@@ -21,6 +23,12 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+
+
+@app.on_event("startup")
+async def startup():
+    init_loop(asyncio.get_running_loop())
+
 
 @app.get("/")
 def read_root():

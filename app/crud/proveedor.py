@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from app.models.proveedor import Proveedor
 from app.models.compra import Compra
 from app.schemas.proveedor import ProveedorCreate
+from app.utils import capitalizar
 
 def get_proveedor(db: Session, proveedor_id: int):
     return db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
@@ -15,10 +16,10 @@ def get_proveedores(db: Session, skip: int = 0, limit: int = 100, solo_activos: 
 
 def create_proveedor(db: Session, proveedor: ProveedorCreate):
     db_proveedor = Proveedor(
-        nombre=proveedor.nombre,
+        nombre=capitalizar(proveedor.nombre),
         nit=proveedor.nit,
         materiales=proveedor.materiales,
-        contacto=proveedor.contacto,
+        contacto=capitalizar(proveedor.contacto),
         celular_contacto=proveedor.celular_contacto,
         email_contacto=proveedor.email_contacto
     )
@@ -30,10 +31,10 @@ def create_proveedor(db: Session, proveedor: ProveedorCreate):
 def update_proveedor(db: Session, proveedor_id: int, proveedor: ProveedorCreate):
     db_proveedor = get_proveedor(db, proveedor_id)
     if db_proveedor:
-        db_proveedor.nombre = proveedor.nombre
+        db_proveedor.nombre = capitalizar(proveedor.nombre)
         db_proveedor.nit = proveedor.nit
         db_proveedor.materiales = proveedor.materiales
-        db_proveedor.contacto = proveedor.contacto
+        db_proveedor.contacto = capitalizar(proveedor.contacto)
         db_proveedor.celular_contacto = proveedor.celular_contacto
         db_proveedor.email_contacto = proveedor.email_contacto
         db.commit()

@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models.cliente import Cliente
 from app.schemas.cliente import ClienteCreate
+from app.utils import capitalizar
 
 def get_cliente(db: Session, cliente_id: int):
     return db.query(Cliente).filter(Cliente.id == cliente_id).first()
@@ -10,7 +11,7 @@ def get_clientes(db: Session, skip: int = 0, limit: int = 100):
 
 def create_cliente(db: Session, cliente: ClienteCreate):
     db_cliente = Cliente(
-        nombre=cliente.nombre,
+        nombre=capitalizar(cliente.nombre),
         nit=cliente.nit,
         celular=cliente.celular,
         direccion=cliente.direccion
@@ -23,7 +24,7 @@ def create_cliente(db: Session, cliente: ClienteCreate):
 def update_cliente(db: Session, cliente_id: int, cliente: ClienteCreate):
     db_cliente = get_cliente(db, cliente_id)
     if db_cliente:
-        db_cliente.nombre = cliente.nombre
+        db_cliente.nombre = capitalizar(cliente.nombre)
         db_cliente.nit = cliente.nit
         db_cliente.celular = cliente.celular
         db_cliente.direccion = cliente.direccion

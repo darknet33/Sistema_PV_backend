@@ -181,9 +181,9 @@ def update_compra(db: Session, compra_id: int, compra: CompraUpdate):
     return _build_response(db, db_compra)
 
 def _get_estado_anulado(db: Session):
-    estado = db.query(Estado).filter(Estado.nombre == "ANULADO").first()
+    estado = db.query(Estado).filter(Estado.nombre == "Anulado").first()
     if not estado:
-        estado = Estado(nombre="ANULADO")
+        estado = Estado(nombre="Anulado")
         db.add(estado)
         db.flush()
     return estado

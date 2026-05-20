@@ -89,6 +89,17 @@ All routers use prefix `/api` (defined in `app/api/__init__.py`).
 - Item number column (`#`) in single entity PDF
 - Single venta PDF: includes SUBTOTAL, IMPUESTO%, DESCUENTO%, TOTAL rows
 
+### WebSocket
+- Endpoint: `ws://host/api/ws/{room}` at `app/api/ws.py`
+- Rooms: `productos`, `ventas`, `compras`, `dashboard`, `reportes`
+- ConnectionManager singleton at `app/ws.py` with `connect()`, `disconnect()`, `broadcast()`
+- Broadcast helpers `broadcast_sync(room, data)` and `broadcast_multiple_sync(rooms, data)` for sync endpoints via `loop.create_task()`
+- **Producto** endpoints broadcast to `["productos", "dashboard"]`
+- **Compra** endpoints broadcast to `["compras", "dashboard", "reportes"]`
+- **Venta** endpoints broadcast to `["ventas", "dashboard", "reportes"]`
+- Message payload: `{"type": "created"|"updated"|"deleted", "room": "..."}`
+- No JWT validation on WebSocket (only room name validated)
+
 ### Excel
 - `GET /api/productos/export-xlsx` — descarga `productos.xlsx`
 - `POST /api/productos/import-xlsx` — importa desde archivo Excel

@@ -218,9 +218,9 @@ def update_venta(db: Session, venta_id: int, venta: VentaUpdate):
     return _build_response(db, db_venta)
 
 def _get_estado_anulado(db: Session):
-    estado = db.query(Estado).filter(Estado.nombre == "ANULADO").first()
+    estado = db.query(Estado).filter(Estado.nombre == "Anulado").first()
     if not estado:
-        estado = Estado(nombre="ANULADO")
+        estado = Estado(nombre="Anulado")
         db.add(estado)
         db.flush()
     return estado

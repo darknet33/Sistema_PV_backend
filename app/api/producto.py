@@ -12,6 +12,7 @@ from app.models.producto import Producto
 from app.models.categoria import Categoria
 from app.models.usuario import Usuario
 from app.auth import SECRET_KEY, ALGORITHM, oauth2_scheme
+from app.ws import broadcast_sync, broadcast_multiple_sync
 
 router = APIRouter()
 
@@ -142,6 +143,7 @@ async def import_productos(
             db.rollback()
             resultados["errores"].append(f"Fila {row_num}: {str(e)}")
     
+    broadcast_multiple_sync(["productos", "dashboard"], {"type": "updated", "room": "productos"})
     return resultados
 
 @router.post("/delete-batch")
@@ -149,11 +151,13 @@ def delete_productos_batch_endpoint(ids: List[int], db: Session = Depends(get_db
     if not ids:
         raise HTTPException(status_code=400, detail="No se proporcionaron IDs")
     count = crud_delete_batch(db, ids)
+    broadcast_multiple_sync(["productos", "dashboard"], {"type": "deleted", "room": "productos"})
     return {"message": f"{count} productos procesados", "count": count}
 
 @router.delete("/all")
 def delete_all_productos_endpoint(db: Session = Depends(get_db)):
     count = crud_delete_all(db)
+    broadcast_multiple_sync(["productos", "dashboard"], {"type": "deleted", "room": "productos"})
     return {"message": f"Todos los productos procesados ({count})", "count": count}
 
 @router.get("/codigo/{codigo}", response_model=ProductoResponse)
@@ -175,13 +179,16 @@ def create_producto_endpoint(producto: ProductoCreate, db: Session = Depends(get
     db_producto = get_producto_by_codigo(db, producto.codigo)
     if db_producto:
         raise HTTPException(status_code=400, detail="Codigo already registered")
-    return create_producto(db, producto)
+    result = create_producto(db, producto)
+    broadcast_multiple_sync(["productos", "dashboard"], {"type": "created", "room": "productos"})
+    return result
 
 @router.put("/{producto_id}", response_model=ProductoResponse)
 def update_producto_endpoint(producto_id: int, producto: ProductoUpdate, db: Session = Depends(get_db)):
     db_producto = update_producto(db, producto_id, producto)
     if not db_producto:
         raise HTTPException(status_code=404, detail="Producto not found")
+    broadcast_multiple_sync(["productos", "dashboard"], {"type": "updated", "room": "productos"})
     return db_producto
 
 @router.delete("/{producto_id}")
@@ -189,6 +196,7 @@ def delete_producto_endpoint(producto_id: int, db: Session = Depends(get_db)):
     db_producto = delete_producto(db, producto_id)
     if not db_producto:
         raise HTTPException(status_code=404, detail="Producto not found")
+    broadcast_multiple_sync(["productos", "dashboard"], {"type": "deleted", "room": "productos"})
     return {"message": "Producto deleted"}
 
 @router.patch("/{producto_id}/toggle-activo", response_model=ProductoResponse)
@@ -199,4 +207,5 @@ def toggle_producto_activo(producto_id: int, db: Session = Depends(get_db)):
     db_producto.activo = not db_producto.activo
     db.commit()
     db.refresh(db_producto)
+    broadcast_multiple_sync(["productos", "dashboard"], {"type": "updated", "room": "productos"})
     return db_producto

@@ -4,6 +4,7 @@ from app.models.estado import Estado
 from app.models.compra import Compra
 from app.models.venta import Venta
 from app.schemas.estado import EstadoCreate
+from app.utils import capitalizar
 
 def get_estado(db: Session, estado_id: int):
     return db.query(Estado).filter(Estado.id == estado_id).first()
@@ -12,7 +13,7 @@ def get_estados(db: Session, skip: int = 0, limit: int = 100):
     return db.query(Estado).offset(skip).limit(limit).all()
 
 def create_estado(db: Session, estado: EstadoCreate):
-    db_estado = Estado(nombre=estado.nombre)
+    db_estado = Estado(nombre=capitalizar(estado.nombre))
     db.add(db_estado)
     db.commit()
     db.refresh(db_estado)
@@ -21,7 +22,7 @@ def create_estado(db: Session, estado: EstadoCreate):
 def update_estado(db: Session, estado_id: int, estado: EstadoCreate):
     db_estado = get_estado(db, estado_id)
     if db_estado:
-        db_estado.nombre = estado.nombre
+        db_estado.nombre = capitalizar(estado.nombre)
         db.commit()
         db.refresh(db_estado)
     return db_estado
