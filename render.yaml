@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: sistema-inventario-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: sistema-inventario-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: sistema-inventario-db
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: sistema-inventario-db
+          property: user
+      - key: DB_PASS
+        fromDatabase:
+          name: sistema-inventario-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: sistema-inventario-db
+          property: database
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+
+  - type: mysql
+    name: sistema-inventario-db
+    plan: free
+    database: sistema_rhino
+    user: rhino
