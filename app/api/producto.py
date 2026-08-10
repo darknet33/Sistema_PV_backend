@@ -3,8 +3,11 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 from io import BytesIO
+import os
+from pathlib import Path
 from openpyxl import Workbook, load_workbook
 from jose import jwt
+from PIL import Image
 from app.database import get_db
 from app.schemas.producto import ProductoCreate, ProductoUpdate, ProductoResponse
 from app.crud.producto import get_productos, get_producto, get_producto_by_codigo, create_producto, update_producto, delete_producto, delete_productos_batch as crud_delete_batch, delete_all_productos as crud_delete_all
@@ -15,6 +18,10 @@ from app.auth import SECRET_KEY, ALGORITHM, oauth2_scheme
 from app.ws import broadcast_sync, broadcast_multiple_sync
 
 router = APIRouter()
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+UPLOAD_DIR = BASE_DIR / "uploads" / "productos"
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 @router.get("/", response_model=List[ProductoResponse])
 def read_productos(skip: int = 0, limit: int = 10000, db: Session = Depends(get_db)):
@@ -28,7 +35,7 @@ def export_productos(db: Session = Depends(get_db)):
     ws = wb.active
     ws.title = "Productos"
     
-    headers = ["ÏD", "Código", "Categoría", "Descripción", "Marca", "Costo Bs.", "Utilidad Bs.", "Peso Kg", "Stock Inicial", "Stock Mínimo", "Estado"]
+    headers = ["ÏD", "Código", "Categoría", "Descripción", "Marca", "Procedencia", "Costo Bs.", "Utilidad Bs.", "Stock Inicial", "Stock Mínimo", "Stock Máximo", "Estado"]
     ws.append(headers)
     
     for p in productos:
@@ -38,11 +45,12 @@ def export_productos(db: Session = Depends(get_db)):
             p.categoria.nombre if p.categoria else "",
             p.descripcion,
             p.marca,
+            p.procedencia,
             float(p.precio),
             float(p.utilidad),
-            float(p.peso),
             p.stock_inicial,
             p.stock_minimo,
+            p.stock_maximo,
             "Activo" if p.activo else "Inactivo",
         ])
     
@@ -85,12 +93,12 @@ async def import_productos(
     for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not row or all(v is None for v in row):
             continue
-        if len(row) < 11:
-            resultados["errores"].append(f"Fila {row_num}: Solo {len(row)} columnas (se esperan 11)")
+        if len(row) < 12:
+            resultados["errores"].append(f"Fila {row_num}: Solo {len(row)} columnas (se esperan 12)")
             continue
         
         try:
-            _, codigo, categoria_nombre, descripcion, marca, costo_bs, utilidad_bs, peso_kg, stock_inicial, stock_minimo, estado = row
+            _, codigo, categoria_nombre, descripcion, marca, procedencia, costo_bs, utilidad_bs, stock_inicial, stock_minimo, stock_maximo, estado = row
             
             if not codigo or not descripcion or not marca:
                 resultados["errores"].append(f"Fila {row_num}: Faltan campos obligatorios (codigo, descripcion, marca)")
@@ -113,10 +121,11 @@ async def import_productos(
                 producto_existente.categoria_id = categoria.id if categoria else producto_existente.categoria_id
                 producto_existente.descripcion = str(descripcion)
                 producto_existente.marca = str(marca)
+                producto_existente.procedencia = str(procedencia) if procedencia else ""
                 producto_existente.precio = float(costo_bs) if costo_bs else 0
                 producto_existente.utilidad = float(utilidad_bs) if utilidad_bs else 0
-                producto_existente.peso = float(peso_kg) if peso_kg else 0
                 producto_existente.stock_minimo = int(stock_minimo) if stock_minimo else 0
+                producto_existente.stock_maximo = int(stock_maximo) if stock_maximo else 0
                 if estado:
                     producto_existente.activo = str(estado).strip().lower() == "activo"
                 db.commit()
@@ -127,12 +136,13 @@ async def import_productos(
                     categoria_id=categoria.id if categoria else None,
                     descripcion=str(descripcion),
                     marca=str(marca),
+                    procedencia=str(procedencia) if procedencia else "",
                     precio=float(costo_bs) if costo_bs else 0,
                     utilidad=float(utilidad_bs) if utilidad_bs else 0,
-                    peso=float(peso_kg) if peso_kg else 0,
                     stock_inicial=int(stock_inicial) if stock_inicial else 0,
                     stock_actual=int(stock_inicial) if stock_inicial else 0,
                     stock_minimo=int(stock_minimo) if stock_minimo else 0,
+                    stock_maximo=int(stock_maximo) if stock_maximo else 0,
                     activo=str(estado).strip().lower() == "activo" if estado else True,
                     usuario_id=usuario_id,
                 )
@@ -209,3 +219,49 @@ def toggle_producto_activo(producto_id: int, db: Session = Depends(get_db)):
     db.refresh(db_producto)
     broadcast_multiple_sync(["productos", "dashboard"], {"type": "updated", "room": "productos"})
     return db_producto
+
+@router.post("/{producto_id}/imagen")
+async def upload_producto_imagen(producto_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    db_producto = get_producto(db, producto_id)
+    if not db_producto:
+        raise HTTPException(status_code=404, detail="Producto not found")
+
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Formato no permitido: {ext or 'desconocido'}. Permitidos: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
+
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    image_path = UPLOAD_DIR / f"{producto_id}{ext}"
+
+    contents = await file.read()
+    try:
+        img = Image.open(BytesIO(contents))
+        img.verify()
+    except Exception:
+        raise HTTPException(status_code=400, detail="El archivo no es una imagen válida")
+
+    image_path.write_bytes(contents)
+    url = f"/uploads/productos/{producto_id}{ext}"
+    db_producto.imagen = url
+    db.commit()
+    db.refresh(db_producto)
+    broadcast_multiple_sync(["productos", "dashboard"], {"type": "updated", "room": "productos"})
+    return {"imagen": url}
+
+@router.delete("/{producto_id}/imagen")
+def delete_producto_imagen(producto_id: int, db: Session = Depends(get_db)):
+    db_producto = get_producto(db, producto_id)
+    if not db_producto:
+        raise HTTPException(status_code=404, detail="Producto not found")
+    if db_producto.imagen:
+        try:
+            old_path = Path(str(BASE_DIR / db_producto.imagen.lstrip("/")))
+            if old_path.exists():
+                old_path.unlink()
+        except Exception:
+            pass
+        db_producto.imagen = None
+        db.commit()
+        db.refresh(db_producto)
+        broadcast_multiple_sync(["productos", "dashboard"], {"type": "updated", "room": "productos"})
+    return {"message": "Imagen eliminada", "imagen": None}

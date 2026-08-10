@@ -25,6 +25,7 @@ ADMIN_MODULES = [
     "Reportes",
     "Usuarios",
     "Roles",
+    "Empresa",
 ]
 
 @router.get("/check-users")

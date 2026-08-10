@@ -3,9 +3,11 @@ from datetime import datetime
 from typing import Optional
 import io
 from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
+from app.reports.common import build_header, get_empresa, empresa_colors, make_canvasmaker, get_logo_header_info
 
 def generar_reporte_ventas(db: Session, fecha_inicio: datetime, fecha_fin: datetime,
                            cliente_text: Optional[str] = None, estado_id: Optional[int] = None):
@@ -28,11 +30,17 @@ def generar_reporte_ventas(db: Session, fecha_inicio: datetime, fecha_fin: datet
     ventas = query.order_by(Venta.fecha.desc()).all()
 
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    logo_path, logo_h = get_logo_header_info(db)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        bottomMargin=1.1 * inch,
+        topMargin=(logo_h + 0.4 * inch) if logo_h else 0.8 * inch,
+    )
     styles = getSampleStyleSheet()
     elements = []
 
-    elements.append(Paragraph("Reporte de Ventas", styles['Title']))
+    elements.extend(build_header(db, "Reporte de Ventas"))
     elements.append(Paragraph(f"Período: {fecha_inicio.date()} al {fecha_fin.date()}", styles['Normal']))
     elements.append(Spacer(1, 20))
 
@@ -45,9 +53,11 @@ def generar_reporte_ventas(db: Session, fecha_inicio: datetime, fecha_fin: datet
                     f"{comp.nombre} {v.num_comprobante}", e.nombre, f"{total:.2f}"])
         total_general += total
 
+    primary, secondary = empresa_colors(db)
+
     table = Table(data)
     table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('BACKGROUND', (0, 0), (-1, 0), secondary),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -64,6 +74,6 @@ def generar_reporte_ventas(db: Session, fecha_inicio: datetime, fecha_fin: datet
     elements.append(Spacer(1, 20))
     elements.append(Paragraph(f"Total General: {total_general:.2f}", styles['Heading2']))
 
-    doc.build(elements)
+    doc.build(elements, canvasmaker=make_canvasmaker(get_empresa(db), logo_path, logo_h))
     buffer.seek(0)
     return buffer

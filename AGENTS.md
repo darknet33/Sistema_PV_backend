@@ -103,8 +103,19 @@ All routers use prefix `/api` (defined in `app/api/__init__.py`).
 ### Excel
 - `GET /api/productos/export-xlsx` — descarga `productos.xlsx`
 - `POST /api/productos/import-xlsx` — importa desde archivo Excel
-- **Columnas**: `ÏD`, `Código`, `Categoría`, `Descripción`, `Marca`, `Costo Bs.`, `Utilidad Bs.`, `Peso Kg`, `Stock Inicial`, `Stock Mínimo`, `Estado`
+- **Columnas**: `ÏD`, `Código`, `Categoría`, `Descripción`, `Marca`, `Procedencia`, `Costo Bs.`, `Utilidad Bs.`, `Stock Inicial`, `Stock Mínimo`, `Stock Máximo`, `Estado`
 - `Costo Bs.` se mapea a `precio` en la BD; `Stock Actual` no se importa (se gestiona automáticamente, arranca en 0 para nuevos productos)
+
+### Migraciones (Alembic)
+- Configuración en `alembic/env.py` (lee `DATABASE_URL` de `app.database`, `target_metadata = Base.metadata` con `import app.models`)
+- Crear migración: `venv\Scripts\alembic.exe revision --autogenerate -m "<descripcion>"`
+- Aplicar: `venv\Scripts\alembic.exe upgrade head`
+- Baseline inicial (no-op) = `6ccf96e83613`; cambios de producto = `df08dc1086a7`
+
+### Imagen de Producto
+- `POST /api/productos/{id}/imagen` (multipart) — valida formato (`jpg/jpeg/png/gif/webp`) y que sea imagen válida (Pillow); guarda en `uploads/productos/{id}{ext}` y devuelve `{ "imagen": "/uploads/productos/{id}{ext}" }`
+- `DELETE /api/productos/{id}/imagen` — elimina archivo y pone `imagen = NULL`
+- Estáticos montados en `/uploads` (main.py), carpetas creadas en `main.py` al importar
 
 ### Error Handling
 - FastAPI HTTPException with descriptive `detail`

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api import usuario, rol, modulo, categoria, producto, proveedor, cliente, comprobante, estado, compra, venta, auth, reporte, configuracion, ws
+from app.api import usuario, rol, modulo, categoria, producto, proveedor, cliente, comprobante, estado, compra, venta, auth, reporte, configuracion, ws, empresa
 
 api_router = APIRouter(prefix="/api")
 
@@ -17,4 +17,5 @@ api_router.include_router(compra.router, prefix="/compras", tags=["Compras"])
 api_router.include_router(venta.router, prefix="/ventas", tags=["Ventas"])
 api_router.include_router(reporte.router, prefix="/reportes", tags=["Reportes"])
 api_router.include_router(configuracion.router, prefix="/configuracion", tags=["Configuración"])
+api_router.include_router(empresa.router, prefix="/empresa", tags=["Empresa"])
 api_router.include_router(ws.router)

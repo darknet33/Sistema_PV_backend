@@ -21,12 +21,14 @@ def create_producto(db: Session, producto: ProductoCreate):
         categoria_id=producto.categoria_id,
         descripcion=producto.descripcion,
         marca=producto.marca,
+        procedencia=producto.procedencia,
         precio=producto.precio,
         utilidad=producto.utilidad,
-        peso=producto.peso,
         stock_inicial=producto.stock_inicial,
         stock_actual=producto.stock_actual,
         stock_minimo=producto.stock_minimo,
+        stock_maximo=producto.stock_maximo,
+        imagen=producto.imagen,
         usuario_id=producto.usuario_id
     )
     db.add(db_producto)

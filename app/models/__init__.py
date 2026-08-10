@@ -12,5 +12,6 @@ from app.models.estado import Estado
 from app.models.transaccion import Transaccion
 from app.models.compra import Compra
 from app.models.compra_detalle import CompraDetalle
+from app.models.empresa import Empresa
 from app.models.venta import Venta
 from app.models.venta_detalle import VentaDetalle

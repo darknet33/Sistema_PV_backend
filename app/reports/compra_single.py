@@ -5,6 +5,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.units import inch
+from app.reports.common import build_header, get_empresa, empresa_colors, make_canvasmaker, get_logo_header_info
 
 def generar_comprobante_compra(db: Session, compra_id: int):
     from app.models.compra import Compra
@@ -25,14 +26,19 @@ def generar_comprobante_compra(db: Session, compra_id: int):
     detalles = db.query(CompraDetalle).filter(CompraDetalle.compra_id == compra_id).all()
 
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    logo_path, logo_h = get_logo_header_info(db)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        bottomMargin=1.1 * inch,
+        topMargin=(logo_h + 0.4 * inch) if logo_h else 0.8 * inch,
+    )
     styles = getSampleStyleSheet()
     elements = []
 
     styles.add(ParagraphStyle(name='RightAlign', parent=styles['Normal'], alignment=2))
 
-    elements.append(Paragraph("Comprobante de Compra", styles['Title']))
-    elements.append(Spacer(1, 12))
+    elements.extend(build_header(db, "Comprobante de Compra"))
 
     info_data = [
         [f"Compra N°: {compra.id}", f"Fecha: {compra.fecha.strftime('%d/%m/%Y %H:%M')}"],
@@ -93,9 +99,11 @@ def generar_comprobante_compra(db: Session, compra_id: int):
         Paragraph(f"Bs. {total:.2f}", styles['CellRight']),
     ])
 
+    primary, secondary = empresa_colors(db)
+
     table = Table(data, colWidths=[0.4*inch, 0.8*inch, 2.6*inch, 0.6*inch, 1.0*inch, 1.0*inch])
     table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#404040')),
+        ('BACKGROUND', (0, 0), (-1, 0), secondary),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('ALIGN', (1, 1), (1, -1), 'LEFT'),
@@ -111,6 +119,6 @@ def generar_comprobante_compra(db: Session, compra_id: int):
     ]))
 
     elements.append(table)
-    doc.build(elements)
+    doc.build(elements, canvasmaker=make_canvasmaker(get_empresa(db), logo_path, logo_h))
     buffer.seek(0)
     return buffer

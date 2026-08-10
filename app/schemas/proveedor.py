@@ -8,7 +8,7 @@ class ProveedorBase(BaseModel):
     materiales: str
     contacto: str
     celular_contacto: str
-    email_contacto: str
+    email_contacto: str = ""
 
 class ProveedorCreate(ProveedorBase):
     pass

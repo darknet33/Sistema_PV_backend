@@ -8,12 +8,14 @@ class ProductoBase(BaseModel):
     categoria_id: int
     descripcion: str
     marca: str
+    procedencia: str = ""
     precio: Decimal = 0
     utilidad: Decimal = 0
-    peso: Decimal = 0
     stock_inicial: int
     stock_actual: int
     stock_minimo: int
+    stock_maximo: int = 0
+    imagen: Optional[str] = None
     usuario_id: int
 
 class ProductoCreate(ProductoBase):
@@ -23,10 +25,12 @@ class ProductoUpdate(BaseModel):
     categoria_id: Optional[int] = None
     descripcion: Optional[str] = None
     marca: Optional[str] = None
+    procedencia: Optional[str] = None
     precio: Optional[Decimal] = None
     utilidad: Optional[Decimal] = None
-    peso: Optional[Decimal] = None
     stock_minimo: Optional[int] = None
+    stock_maximo: Optional[int] = None
+    imagen: Optional[str] = None
     activo: Optional[bool] = None
 
 class ProductoResponse(BaseModel):
@@ -35,12 +39,14 @@ class ProductoResponse(BaseModel):
     categoria_id: Optional[int] = None
     descripcion: str
     marca: str
+    procedencia: str = ""
     precio: Decimal = 0
     utilidad: Decimal = 0
-    peso: Decimal = 0
     stock_inicial: int
     stock_actual: int
     stock_minimo: int
+    stock_maximo: int = 0
+    imagen: Optional[str] = None
     usuario_id: Optional[int] = None
     activo: bool
     fecha_registro: datetime
