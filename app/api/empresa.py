@@ -27,6 +27,8 @@ def _default_response():
         "direccion": "",
         "ciudad": "",
         "logo": None,
+        "imagen_encabezado": None,
+        "imagen_pie": None,
         "color_principal": "#1677ff",
         "color_secundario": "#001529",
     }
@@ -45,8 +47,8 @@ def update_empresa_endpoint(data: EmpresaUpdate, db: Session = Depends(get_db)):
     return update_empresa(db, data)
 
 
-@router.post("/logo")
-async def upload_empresa_logo(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def _guardar_imagen(db: Session, file: UploadFile, prefijo: str, campo: str):
+    """Valida la imagen, la guarda en uploads/empresa y actualiza el campo indicado."""
     db_empresa = get_empresa(db)
     if not db_empresa:
         db_empresa = Empresa()
@@ -58,7 +60,7 @@ async def upload_empresa_logo(file: UploadFile = File(...), db: Session = Depend
         raise HTTPException(status_code=400, detail=f"Formato no permitido: {ext or 'desconocido'}. Permitidos: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
 
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    image_path = UPLOAD_DIR / f"logo{ext}"
+    image_path = UPLOAD_DIR / f"{prefijo}{ext}"
 
     contents = await file.read()
     try:
@@ -68,24 +70,60 @@ async def upload_empresa_logo(file: UploadFile = File(...), db: Session = Depend
         raise HTTPException(status_code=400, detail="El archivo no es una imagen válida")
 
     image_path.write_bytes(contents)
-    url = f"/uploads/empresa/logo{ext}"
-    db_empresa.logo = url
+    url = f"/uploads/empresa/{prefijo}{ext}"
+    setattr(db_empresa, campo, url)
     db.commit()
     db.refresh(db_empresa)
+    return url
+
+
+def _eliminar_imagen(db: Session, campo: str):
+    db_empresa = get_empresa(db)
+    url = getattr(db_empresa, campo) if db_empresa else None
+    if db_empresa and url:
+        try:
+            old_path = Path(str(BASE_DIR / url.lstrip("/")))
+            if old_path.exists():
+                old_path.unlink()
+        except Exception:
+            pass
+        setattr(db_empresa, campo, None)
+        db.commit()
+        db.refresh(db_empresa)
+    return None
+
+
+@router.post("/logo")
+async def upload_empresa_logo(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    url = await _guardar_imagen(db, file, "logo", "logo")
     return {"logo": url}
 
 
 @router.delete("/logo", response_model=dict)
 def delete_empresa_logo(db: Session = Depends(get_db)):
-    db_empresa = get_empresa(db)
-    if db_empresa and db_empresa.logo:
-        try:
-            old_path = Path(str(BASE_DIR / db_empresa.logo.lstrip("/")))
-            if old_path.exists():
-                old_path.unlink()
-        except Exception:
-            pass
-        db_empresa.logo = None
-        db.commit()
-        db.refresh(db_empresa)
+    _eliminar_imagen(db, "logo")
     return {"message": "Logo eliminado", "logo": None}
+
+
+@router.post("/imagen-encabezado")
+async def upload_empresa_imagen_encabezado(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    url = await _guardar_imagen(db, file, "encabezado", "imagen_encabezado")
+    return {"imagen_encabezado": url}
+
+
+@router.delete("/imagen-encabezado", response_model=dict)
+def delete_empresa_imagen_encabezado(db: Session = Depends(get_db)):
+    _eliminar_imagen(db, "imagen_encabezado")
+    return {"message": "Imagen de encabezado eliminada", "imagen_encabezado": None}
+
+
+@router.post("/imagen-pie")
+async def upload_empresa_imagen_pie(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    url = await _guardar_imagen(db, file, "pie", "imagen_pie")
+    return {"imagen_pie": url}
+
+
+@router.delete("/imagen-pie", response_model=dict)
+def delete_empresa_imagen_pie(db: Session = Depends(get_db)):
+    _eliminar_imagen(db, "imagen_pie")
+    return {"message": "Imagen de pie de página eliminada", "imagen_pie": None}

@@ -21,6 +21,7 @@ def get_empresa(db: Session):
         return {
             "nombre": "", "razon_social": "", "nit": "", "telefono": "",
             "correo": "", "direccion": "", "ciudad": "", "logo": None,
+            "imagen_encabezado": None, "imagen_pie": None,
             "color_principal": DEFAULT_PRIMARY, "color_secundario": DEFAULT_SECONDARY,
         }
     return {
@@ -32,6 +33,8 @@ def get_empresa(db: Session):
         "direccion": emp.direccion or "",
         "ciudad": emp.ciudad or "",
         "logo": emp.logo,
+        "imagen_encabezado": emp.imagen_encabezado,
+        "imagen_pie": emp.imagen_pie,
         "color_principal": emp.color_principal or DEFAULT_PRIMARY,
         "color_secundario": emp.color_secundario or DEFAULT_SECONDARY,
     }
@@ -55,9 +58,8 @@ def empresa_colors(db: Session):
 PAGE_W, PAGE_H = letter[0], letter[1]
 
 
-def get_logo_header_info(db: Session):
-    emp = get_empresa(db)
-    url = emp.get("logo")
+def _get_imagen_info(url):
+    """Devuelve (path, altura_a_ancho_completo) para una url de imagen, o (None, 0.0)."""
     if not url:
         return None, 0.0
     try:
@@ -65,13 +67,22 @@ def get_logo_header_info(db: Session):
         if not path.exists():
             return None, 0.0
         from PIL import Image as PILImage
-        with PILImage.open(path) as img:
+        with PILImage.open(str(path)) as img:
             w, h = img.size
         if w <= 0 or h <= 0:
             return None, 0.0
         return str(path), PAGE_W * (h / w)
     except Exception:
         return None, 0.0
+
+
+def get_logo_header_info(db: Session):
+    """Info de la imagen de encabezado: prioriza imagen_encabezado, respalda al logo."""
+    emp = get_empresa(db)
+    path, height = _get_imagen_info(emp.get("imagen_encabezado"))
+    if path:
+        return path, height
+    return _get_imagen_info(emp.get("logo"))
 
 
 def build_header(db: Session, titulo: str):
@@ -106,6 +117,7 @@ class _NumberedCanvas(canvas_module.Canvas):
         for state in self._saved_page_states:
             self.__dict__.update(state)
             self._draw_header_logo()
+            self._draw_footer_image()
             self._draw_footer(num_pages)
             canvas_module.Canvas.showPage(self)
         canvas_module.Canvas.save(self)
@@ -125,11 +137,44 @@ class _NumberedCanvas(canvas_module.Canvas):
         )
         self.restoreState()
 
+    def _draw_footer_image(self):
+        """Dibuja la imagen de pie de página a ancho completo (alto máx ~1") si existe."""
+        url = (self._empresa or {}).get("imagen_pie")
+        if not url:
+            return
+        try:
+            path = BASE_DIR / url.lstrip("/")
+            if not path.exists():
+                return
+            from PIL import Image as PILImage
+            with PILImage.open(str(path)) as img:
+                w, h = img.size
+            if w <= 0 or h <= 0:
+                return
+            max_h = 1.0 * inch
+            band_h = min(max_h, PAGE_W * (h / w))
+            self.saveState()
+            self.drawImage(
+                str(path),
+                0,
+                0,
+                PAGE_W,
+                band_h,
+                preserveAspectRatio=True,
+                mask='auto',
+            )
+            self.restoreState()
+        except Exception:
+            return
+
     def _draw_footer(self, num_pages):
         emp = self._empresa or {}
         primary = hexcolor(emp.get("color_principal", DEFAULT_PRIMARY), DEFAULT_PRIMARY)
         secondary = hexcolor(emp.get("color_secundario", DEFAULT_SECONDARY), DEFAULT_SECONDARY)
         self.saveState()
+
+        url_pie = (emp.get("imagen_pie") or "").strip()
+        tiene_pie_imagen = bool(url_pie) and (BASE_DIR / url_pie.lstrip("/")).exists()
 
         # Datos de la empresa
         nombre = (emp.get("nombre") or "").strip()
@@ -158,7 +203,16 @@ class _NumberedCanvas(canvas_module.Canvas):
         if nit:
             items.append((ICON_STAR, f"NIT: {nit}"))
 
-        if not items:
+        if not tiene_pie_imagen and not items:
+            self.restoreState()
+            return
+
+        # Con imagen de pie: solo se muestra el número de página sobre la imagen
+        if tiene_pie_imagen:
+            page_text = f"Página {self._pageNumber} de {num_pages}"
+            self.setFont('Helvetica', 7)
+            self.setFillColor(secondary)
+            self.drawCentredString(letter[0] / 2, 0.08 * inch, page_text)
             self.restoreState()
             return
 

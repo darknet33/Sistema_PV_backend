@@ -43,6 +43,8 @@ class EmpresaUpdate(EmpresaBase):
 class EmpresaResponse(EmpresaBase):
     id: int
     logo: Optional[str] = None
+    imagen_encabezado: Optional[str] = None
+    imagen_pie: Optional[str] = None
 
     class Config:
         from_attributes = True

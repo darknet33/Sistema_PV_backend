@@ -13,5 +13,7 @@ class Empresa(Base):
     direccion = Column(String(200), nullable=False, default="")
     ciudad = Column(String(100), nullable=False, default="")
     logo = Column(String(255), nullable=True)
+    imagen_encabezado = Column(String(255), nullable=True)
+    imagen_pie = Column(String(255), nullable=True)
     color_principal = Column(String(9), nullable=False, default="#1677ff")
     color_secundario = Column(String(9), nullable=False, default="#001529")
