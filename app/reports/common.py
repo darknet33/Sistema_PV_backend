@@ -138,7 +138,7 @@ class _NumberedCanvas(canvas_module.Canvas):
         self.restoreState()
 
     def _draw_footer_image(self):
-        """Dibuja la imagen de pie de página a ancho completo (alto máx ~1") si existe."""
+        """Dibuja la imagen de pie de página a ancho completo respetando su escala si existe."""
         url = (self._empresa or {}).get("imagen_pie")
         if not url:
             return
@@ -151,8 +151,7 @@ class _NumberedCanvas(canvas_module.Canvas):
                 w, h = img.size
             if w <= 0 or h <= 0:
                 return
-            max_h = 1.0 * inch
-            band_h = min(max_h, PAGE_W * (h / w))
+            band_h = PAGE_W * (h / w)
             self.saveState()
             self.drawImage(
                 str(path),
