@@ -139,104 +139,108 @@ class _NumberedCanvas(canvas_module.Canvas):
         direccion = (emp.get("direccion") or "").strip()
         ciudad = (emp.get("ciudad") or "").strip()
 
+        # ---- ICONOS (glifos ZapfDingbats) ----
+        ICON_STAR = '\x4b'    # estrella rellena
+        ICON_PHONE = '\x26'   # teléfono
+        ICON_MAIL = '\x40'    # sobre (correo)
+        ICON_PIN = '\x41'     # índice apuntando (dirección)
+
+        items = []
+        if nombre:
+            items.append((ICON_STAR, nombre))
+        if telefono:
+            items.append((ICON_PHONE, telefono))
+        if correo:
+            items.append((ICON_MAIL, correo))
+        address = ", ".join(x for x in (direccion, ciudad) if x)
+        if address:
+            items.append((ICON_PIN, address))
+        if nit:
+            items.append((ICON_STAR, f"NIT: {nit}"))
+
+        if not items:
+            self.restoreState()
+            return
+
         # ---- ESTILO TARJETA: fondo beige con borde ----
-        # Definir dimensiones de la tarjeta en el footer
-        card_width = 6.5 * inch   # ancho de la tarjeta
-        card_height = 1.8 * inch  # altura de la tarjeta
+        card_width = 6.9 * inch   # ancho de la tarjeta
         card_x = (letter[0] - card_width) / 2  # centrado horizontal
         card_y = 0.20 * inch      # posición desde abajo
 
-        # Fondo de la tarjeta (beige)
+        # Parámetros de layout (puntos)
+        icon_size = 9
+        icon_radius = 6.5
+        gap_icon_text = 5
+        gap_items = 22
+        margin_x = 0.35 * inch
+        line_step = 0.24 * inch
+        pad_y = 0.08 * inch
+
+        def item_width(icon, text):
+            return 2 * icon_radius + gap_icon_text + self.stringWidth(text, 'Helvetica', 8.5)
+
+        def line_width(line):
+            return sum(item_width(i, t) for i, t in line) + gap_items * (len(line) - 1)
+
+        # Distribuir ítems en líneas centradas (envuelve si no caben)
+        available = card_width - 2 * margin_x
+        lines = []
+        current = []
+        current_w = 0.0
+        for it in items:
+            w = item_width(*it)
+            add = w if not current else w + gap_items
+            if current and current_w + add > available:
+                lines.append(current)
+                current = [it]
+                current_w = w
+            else:
+                current.append(it)
+                current_w += add
+        if current:
+            lines.append(current)
+
+        # Altura de la tarjeta según número de líneas
+        card_height = pad_y * 2 + line_step * len(lines)
         background = hexcolor(emp.get("color_fondo", "#eae3d7"))
+
+        # Sombra sutil (detrás de la tarjeta)
+        self.setFillColor(colors.Color(0, 0, 0, alpha=0.08))
+        self.roundRect(card_x + 2, card_y - 2, card_width, card_height, 8, fill=1, stroke=0)
+
+        # Fondo de la tarjeta (beige)
         self.setFillColor(background)
         self.setStrokeColor(colors.Color(0.75, 0.71, 0.64))  # #bfb5a2
         self.setLineWidth(0.8)
         self.roundRect(card_x, card_y, card_width, card_height, 8, fill=1, stroke=1)
 
-        # Sombra sutil
-        self.setFillColor(colors.Color(0, 0, 0, alpha=0.08))
-        self.roundRect(card_x + 2, card_y - 2, card_width, card_height, 8, fill=1, stroke=0)
+        # Fondo suave de los iconos
+        icon_bg = colors.Color(primary.red, primary.green, primary.blue, alpha=0.15)
 
-        # ---- MARGENES INTERNOS ----
-        margin_left = 0.25 * inch
-        margin_top = 0.15 * inch
-        text_x = card_x + margin_left
-        text_y = card_y + card_height - margin_top
-
-        # ---- FUNCIÓN PARA DIBUJAR CAMPO ----
-        def draw_field(label_text, content_text, y_pos, is_nit=False, is_address=False):
-            """Dibuja un campo estilo tarjeta"""
-            # Etiqueta en negrita
-            self.setFillColor(primary)
-            self.setFont('Helvetica-Bold', 7)
-            self.drawString(text_x, y_pos, label_text)
-
-            # Línea debajo de la etiqueta
-            label_width = self.stringWidth(label_text, 'Helvetica-Bold', 7)
-            line_y = y_pos - 2.5
-            self.setStrokeColor(primary)
-            self.setLineWidth(1.2)
-            self.line(text_x, line_y, text_x + label_width + 4, line_y)
-
-            # Contenido
-            self.setFillColor(secondary)
-            if is_nit:
-                self.setFont('Helvetica-Bold', 8.5)
-            else:
+        # ---- DIBUJAR LÍNEAS CENTRADAS ----
+        for li, line in enumerate(lines):
+            lw = line_width(line)
+            start_x = card_x + (card_width - lw) / 2
+            cy = card_y + card_height - pad_y - line_step * li - line_step / 2
+            x = start_x
+            for i, (icon, text) in enumerate(line):
+                if i > 0:
+                    x += gap_items
+                cx = x + icon_radius
+                # Círculo de icono
+                self.setFillColor(icon_bg)
+                self.setStrokeColor(primary)
+                self.setLineWidth(0.8)
+                self.circle(cx, cy, icon_radius, fill=1, stroke=1)
+                # Glifo del icono centrado en el círculo
+                self.setFillColor(primary)
+                self.setFont('ZapfDingbats', icon_size)
+                self.drawCentredString(cx, cy - icon_size * 0.35, icon)
+                # Texto junto al icono
+                self.setFillColor(secondary)
                 self.setFont('Helvetica', 8.5)
-
-            content_y = y_pos - 10
-
-            if is_address:
-                lines = content_text.split('\n')
-                for i, line in enumerate(lines):
-                    self.drawString(text_x, content_y - (i * 12), line.strip())
-                return content_y - (len(lines) * 12) - 4
-            else:
-                self.drawString(text_x, content_y, content_text)
-                return content_y - 12
-
-        # ---- DIBUJAR CAMPOS EN EL FOOTER ----
-        current_y = text_y
-
-        # 1. NOMBRE / RAZÓN SOCIAL (si existe)
-        if nombre:
-            current_y = draw_field("EMPRESA:", nombre, current_y)
-            current_y -= 4
-
-        # 2. DIRECCIÓN
-        address_text = f"{direccion}\n{ciudad}" if direccion and ciudad else direccion or ciudad
-        if address_text:
-            current_y = draw_field("DIRECCIÓN:", address_text, current_y, is_address=True)
-            current_y -= 4
-
-        # 3. TELÉFONO
-        if telefono:
-            current_y = draw_field("TELÉFONO:", telefono, current_y)
-            current_y -= 4
-
-        # 4. CORREO
-        if correo:
-            current_y = draw_field("CORREO:", correo, current_y)
-            current_y -= 4
-
-        # 5. NIT (con estilo más grueso)
-        if nit:
-            # Etiqueta NIT
-            self.setFillColor(primary)
-            self.setFont('Helvetica-Bold', 7)
-            self.drawString(text_x, current_y, "NIT:")
-
-            label_width = self.stringWidth("NIT:", 'Helvetica-Bold', 7)
-            line_y = current_y - 2.5
-            self.setStrokeColor(primary)
-            self.setLineWidth(1.2)
-            self.line(text_x, line_y, text_x + label_width + 4, line_y)
-
-            # Contenido NIT (más grueso)
-            self.setFillColor(secondary)
-            self.setFont('Helvetica-Bold', 8.5)
-            self.drawString(text_x, current_y - 10, nit)
+                self.drawString(x + 2 * icon_radius + gap_icon_text, cy - 3, text)
+                x += item_width(icon, text)
 
         # ---- NÚMERO DE PÁGINA (fuera de la tarjeta, abajo) ----
         page_text = f"Página {self._pageNumber} de {num_pages}"
