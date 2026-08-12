@@ -36,6 +36,32 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 async def startup():
     init_loop(asyncio.get_running_loop())
     seed_empresa_module()
+    seed_cotizaciones_module()
+
+
+def _seed_module_por_nombre(db, nombre):
+    from app.models.modulo import Modulo
+    from app.models.rol import Rol
+    from app.models.rol_modulo import RolModulo
+
+    modulo = db.query(Modulo).filter(Modulo.nombre == nombre).first()
+    if not modulo:
+        modulo = Modulo(nombre=nombre, activo=True)
+        db.add(modulo)
+        db.flush()
+
+    roles_destino = {rol_id for (rol_id,) in db.query(RolModulo.rol_id).distinct().all()}
+    roles_admin = db.query(Rol.id).filter(Rol.nombre.ilike("%admin%")).all()
+    roles_destino.update(rol_id for (rol_id,) in roles_admin)
+
+    for rol_id in roles_destino:
+        existente = db.query(RolModulo).filter(
+            RolModulo.rol_id == rol_id,
+            RolModulo.modulo_id == modulo.id
+        ).first()
+        if not existente:
+            db.add(RolModulo(rol_id=rol_id, modulo_id=modulo.id))
+    return modulo
 
 
 def seed_empresa_module():
@@ -47,20 +73,24 @@ def seed_empresa_module():
 
         db = SessionLocal()
         try:
-            modulo = db.query(Modulo).filter(Modulo.nombre == "Empresa").first()
-            if not modulo:
-                modulo = Modulo(nombre="Empresa", activo=True)
-                db.add(modulo)
-                db.flush()
+            _seed_module_por_nombre(db, "Empresa")
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        pass
 
-            roles_con_modulos = db.query(RolModulo.rol_id).distinct().all()
-            for (rol_id,) in roles_con_modulos:
-                existente = db.query(RolModulo).filter(
-                    RolModulo.rol_id == rol_id,
-                    RolModulo.modulo_id == modulo.id
-                ).first()
-                if not existente:
-                    db.add(RolModulo(rol_id=rol_id, modulo_id=modulo.id))
+
+def seed_cotizaciones_module():
+    try:
+        from app.database import SessionLocal
+        from app.models.modulo import Modulo
+        from app.models.rol import Rol
+        from app.models.rol_modulo import RolModulo
+
+        db = SessionLocal()
+        try:
+            _seed_module_por_nombre(db, "Cotizaciones")
             db.commit()
         finally:
             db.close()

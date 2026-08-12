@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from app.models.producto import Producto
 from app.models.compra_detalle import CompraDetalle
 from app.models.venta_detalle import VentaDetalle
+from app.models.cotizacion_detalle import CotizacionDetalle
 from app.schemas.producto import ProductoCreate, ProductoUpdate
 
 def get_producto(db: Session, producto_id: int):
@@ -48,7 +49,8 @@ def update_producto(db: Session, producto_id: int, producto: ProductoUpdate):
 def _tiene_relaciones(db: Session, producto_id: int) -> bool:
     en_compras = db.query(CompraDetalle).filter(CompraDetalle.producto_id == producto_id).first()
     en_ventas = db.query(VentaDetalle).filter(VentaDetalle.producto_id == producto_id).first()
-    return bool(en_compras or en_ventas)
+    en_cotizaciones = db.query(CotizacionDetalle).filter(CotizacionDetalle.producto_id == producto_id).first()
+    return bool(en_compras or en_ventas or en_cotizaciones)
 
 def delete_producto(db: Session, producto_id: int):
     db_producto = get_producto(db, producto_id)

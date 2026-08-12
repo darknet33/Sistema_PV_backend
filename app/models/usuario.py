@@ -17,3 +17,4 @@ class Usuario(BaseModel):
     productos = relationship("Producto", back_populates="usuario")
     compras = relationship("Compra", back_populates="usuario")
     ventas = relationship("Venta", back_populates="usuario")
+    cotizaciones = relationship("Cotizacion", back_populates="usuario")

@@ -15,3 +15,5 @@ from app.models.compra_detalle import CompraDetalle
 from app.models.empresa import Empresa
 from app.models.venta import Venta
 from app.models.venta_detalle import VentaDetalle
+from app.models.cotizacion import Cotizacion
+from app.models.cotizacion_detalle import CotizacionDetalle

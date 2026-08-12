@@ -38,13 +38,28 @@ def generar_comprobante_venta(db: Session, venta_id: int):
 
     styles.add(ParagraphStyle(name='RightAlign', parent=styles['Normal'], alignment=2))
 
-    elements.extend(build_header(db, "Comprobante de Venta"))
+    titulo = (comprobante.nombre.upper() if comprobante else 'Comprobante de Venta')
+    elements.extend(build_header(db, titulo))
+
+    primary, secondary = empresa_colors(db)
+
+    num_comprobante = venta.num_comprobante or str(venta.id)
+    styles.add(ParagraphStyle(name='NumComp', parent=styles['Normal'], fontSize=13, leading=16, textColor=secondary, fontName='Helvetica-Bold', alignment=2))
+    num_para = Paragraph(f"N° de Comprobante: {num_comprobante}", styles['NumComp'])
+    num_wrap = Table([[num_para]], colWidths=[6 * inch])
+    num_wrap.setStyle(TableStyle([
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    ]))
+    elements.append(num_wrap)
+    elements.append(Spacer(1, 8))
 
     info_data = [
         [f"Venta N°: {venta.id}", f"Fecha: {venta.fecha.strftime('%d/%m/%Y %H:%M')}"],
         [f"Cliente: {cliente.nombre if cliente else '-'}", ""],
-        [f"Comprobante: {comprobante.nombre if comprobante else '-'} {venta.num_comprobante or ''}", ""],
-        [f"Estado: {estado.nombre if estado else '-'}", f"Impuesto: {venta.impuesto or 0}%  Descuento: {venta.descuento or 0}%"],
+        [f"Estado: {estado.nombre if estado else '-'}", (f"Incluye IVA {venta.impuesto}%" if (venta.impuesto or 0) > 0 else "")],
     ]
     info_table = Table(info_data, colWidths=[3*inch, 3*inch])
     info_table.setStyle(TableStyle([
@@ -94,46 +109,6 @@ def generar_comprobante_venta(db: Session, venta_id: int):
     descuento_monto = subtotal_total * (venta.descuento or 0) / 100
     total = subtotal_total + impuesto_monto - descuento_monto
 
-    data.append([
-        Paragraph('', styles['CellCenter']),
-        Paragraph('', styles['CellWrap']),
-        Paragraph('', styles['CellWrap']),
-        Paragraph('', styles['CellCenter']),
-        Paragraph('SUBTOTAL:', styles['CellRight']),
-        Paragraph(f"Bs. {subtotal_total:.2f}", styles['CellRight']),
-    ])
-
-    if (venta.impuesto or 0) > 0:
-        data.append([
-            Paragraph('', styles['CellCenter']),
-            Paragraph('', styles['CellWrap']),
-            Paragraph('', styles['CellWrap']),
-            Paragraph('', styles['CellCenter']),
-            Paragraph(f'IMP. ({venta.impuesto}%):', styles['CellRight']),
-            Paragraph(f"Bs. {impuesto_monto:.2f}", styles['CellRight']),
-        ])
-
-    if (venta.descuento or 0) > 0:
-        data.append([
-            Paragraph('', styles['CellCenter']),
-            Paragraph('', styles['CellWrap']),
-            Paragraph('', styles['CellWrap']),
-            Paragraph('', styles['CellCenter']),
-            Paragraph(f'DESC. ({venta.descuento}%):', styles['CellRight']),
-            Paragraph(f"- Bs. {descuento_monto:.2f}", styles['CellRight']),
-        ])
-
-    data.append([
-        Paragraph('', styles['CellCenter']),
-        Paragraph('', styles['CellWrap']),
-        Paragraph('', styles['CellWrap']),
-        Paragraph('', styles['CellCenter']),
-        Paragraph('TOTAL:', styles['CellRight']),
-        Paragraph(f"Bs. {total:.2f}", styles['CellRight']),
-    ])
-
-    primary, secondary = empresa_colors(db)
-
     table = Table(data, colWidths=[0.4*inch, 0.8*inch, 2.6*inch, 0.6*inch, 1.0*inch, 1.0*inch])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), secondary),
@@ -143,15 +118,59 @@ def generar_comprobante_venta(db: Session, venta_id: int):
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 10),
         ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ('GRID', (0, 0), (-1, -2), 0.5, colors.grey),
-        ('LINEBELOW', (3, -1), (-1, -1), 1, colors.black),
-        ('FONTNAME', (3, -1), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (3, -1), (-1, -1), 11),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f0f0f0')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#f9f9f9')]),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
     ]))
 
     elements.append(table)
+    elements.append(Spacer(1, 16))
+
+    styles.add(ParagraphStyle(name='TotTitle', parent=styles['Normal'], fontSize=10, leading=14, fontName='Helvetica-Bold', textColor=secondary))
+    styles.add(ParagraphStyle(name='TotLabel', parent=styles['Normal'], fontSize=10, leading=14, alignment=2))
+    styles.add(ParagraphStyle(name='TotValue', parent=styles['Normal'], fontSize=10, leading=14, alignment=2))
+    styles.add(ParagraphStyle(name='TotTotal', parent=styles['Normal'], fontSize=12, leading=16, fontName='Helvetica-Bold', alignment=2, textColor=colors.white))
+
+    tot_rows = [
+        [Paragraph('SUBTOTAL', styles['TotLabel']), Paragraph(f"Bs. {subtotal_total:.2f}", styles['TotValue'])],
+    ]
+    if (venta.impuesto or 0) > 0:
+        tot_rows.append([
+            Paragraph(f'IVA ({venta.impuesto}%)', styles['TotLabel']),
+            Paragraph(f"Bs. {impuesto_monto:.2f}", styles['TotValue']),
+        ])
+    if (venta.descuento or 0) > 0:
+        tot_rows.append([
+            Paragraph(f'DESCUENTO ({venta.descuento}%)', styles['TotLabel']),
+            Paragraph(f"- Bs. {descuento_monto:.2f}", styles['TotValue']),
+        ])
+    tot_rows.append([
+        Paragraph('TOTAL', styles['TotTotal']),
+        Paragraph(f"Bs. {total:.2f}", styles['TotTotal']),
+    ])
+
+    totals_table = Table(tot_rows, colWidths=[2.2*inch, 1.6*inch])
+    totals_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LINEBELOW', (0, 0), (-1, -2), 0.5, colors.grey),
+        ('BACKGROUND', (0, -1), (-1, -1), secondary),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -2), [colors.white, colors.HexColor('#f9f9f9')]),
+    ]))
+
+    total_wrap = Table([[Paragraph('', styles['TotLabel']), totals_table]], colWidths=[2.2*inch, 3.8*inch])
+    total_wrap.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
+
+    elements.append(Paragraph('Resumen', styles['TotTitle']))
+    elements.append(Spacer(1, 4))
+    elements.append(total_wrap)
     doc.build(elements, canvasmaker=make_canvasmaker(get_empresa(db), logo_path, logo_h))
     buffer.seek(0)
     return buffer

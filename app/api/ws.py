@@ -6,7 +6,7 @@ router = APIRouter()
 
 @router.websocket("/ws/{room}")
 async def websocket_endpoint(websocket: WebSocket, room: str):
-    if room not in {"productos", "ventas", "compras", "dashboard", "reportes"}:
+    if room not in {"productos", "ventas", "compras", "dashboard", "reportes", "cotizaciones"}:
         await websocket.close(code=4000, reason="Sala no válida")
         return
 

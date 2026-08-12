@@ -12,3 +12,4 @@ class Cliente(BaseModel):
     activo = Column(Boolean, default=True)
     
     ventas = relationship("Venta", back_populates="cliente")
+    cotizaciones = relationship("Cotizacion", back_populates="cliente")
