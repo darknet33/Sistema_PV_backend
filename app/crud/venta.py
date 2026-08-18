@@ -82,6 +82,9 @@ def _build_response(db: Session, venta: Venta):
         })
 
     usuario = db.query(Usuario).filter(Usuario.id == venta.usuario_id).first()
+    nombre_completo = ""
+    if usuario:
+        nombre_completo = f"{usuario.nombres} {usuario.apellidos}".strip() or usuario.username
 
     return {
         "id": venta.id,
@@ -99,6 +102,7 @@ def _build_response(db: Session, venta: Venta):
         "activo": bool(venta.activo),
         "usuario_id": venta.usuario_id,
         "usuario_username": usuario.username if usuario else "",
+        "usuario_nombre_completo": nombre_completo,
         "fecha_registro": venta.fecha_registro,
         "detalles": detalles_response,
     }

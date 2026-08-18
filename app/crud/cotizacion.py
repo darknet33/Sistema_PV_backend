@@ -17,14 +17,14 @@ from app.models.venta_detalle import VentaDetalle
 from app.schemas.cotizacion import CotizacionCreate, CotizacionUpdate, ConvertirVentaRequest
 from app.crud.venta import _validar_stock_para_venta, _update_stock
 
-IVA_RATE = Decimal("13")
+IVA_RATE = Decimal("16")
 ESTADO_ENVIADO = "Enviado"
 ESTADO_CONFIRMADO = "Confirmado"
 ESTADO_VENCIDO = "Vencido"
 
 
 def _q(value) -> Decimal:
-    return (value or 0).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return Decimal(value or 0).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def _precio_venta(costo: Decimal, utilidad_pct: Decimal) -> Decimal:
@@ -111,10 +111,12 @@ def _build_response(db: Session, cot: Cotizacion):
         "con_factura": bool(cot.con_factura),
         "incluir_imagenes": bool(cot.incluir_imagenes),
         "modalidad_pago": cot.modalidad_pago or "",
+        "forma_pago": cot.forma_pago or "",
         "validez_dias": cot.validez_dias or 0,
         "terminos_condiciones": cot.terminos_condiciones or "",
         "subtotal": cot.subtotal or 0,
         "iva": cot.iva or 0,
+        "descuento": cot.descuento or 0,
         "total": cot.total or 0,
         "activo": bool(cot.activo),
         "usuario_id": cot.usuario_id,
@@ -145,8 +147,9 @@ def _calcular_totales(cot, con_factura: bool):
         subtotal += Decimal(d.cantidad) * Decimal(d.precio_venta)
     subtotal = _q(subtotal)
     iva = _q(subtotal * IVA_RATE / 100) if con_factura else Decimal("0.00")
-    total = _q(subtotal + iva)
-    return subtotal, iva, total
+    descuento_monto = _q(subtotal * (cot.descuento or 0) / 100)
+    total = _q(subtotal + iva - descuento_monto)
+    return subtotal, iva, descuento_monto, total
 
 
 def _fecha_hora(fecha: datetime) -> datetime:
@@ -173,8 +176,10 @@ def create_cotizacion(db: Session, cot: CotizacionCreate, usuario_id: int):
         con_factura=bool(cot.con_factura),
         incluir_imagenes=bool(cot.incluir_imagenes),
         modalidad_pago=cot.modalidad_pago or "",
+        forma_pago=cot.forma_pago or "",
         validez_dias=int(cot.validez_dias or 15),
         terminos_condiciones=cot.terminos_condiciones or "",
+        descuento=_q(cot.descuento),
         usuario_id=usuario_id,
         activo=True,
         cliente_razon_social=cliente.nombre if cliente else "",
@@ -199,7 +204,7 @@ def create_cotizacion(db: Session, cot: CotizacionCreate, usuario_id: int):
         db.add(db_detalle)
 
     db.flush()
-    db_cot.subtotal, db_cot.iva, db_cot.total = _calcular_totales(db_cot, bool(cot.con_factura))
+    db_cot.subtotal, db_cot.iva, _, db_cot.total = _calcular_totales(db_cot, bool(cot.con_factura))
 
     db.commit()
     db.refresh(db_cot)
@@ -234,6 +239,10 @@ def update_cotizacion(db: Session, cotizacion_id: int, cot: CotizacionUpdate):
         db_cot.incluir_imagenes = bool(cot.incluir_imagenes)
     if cot.modalidad_pago is not None:
         db_cot.modalidad_pago = cot.modalidad_pago
+    if cot.forma_pago is not None:
+        db_cot.forma_pago = cot.forma_pago
+    if cot.descuento is not None:
+        db_cot.descuento = _q(cot.descuento)
     if cot.validez_dias is not None:
         db_cot.validez_dias = int(cot.validez_dias)
         db_cot.fecha_vencimiento = db_cot.fecha + timedelta(days=int(cot.validez_dias))
@@ -257,7 +266,7 @@ def update_cotizacion(db: Session, cotizacion_id: int, cot: CotizacionUpdate):
             db.add(db_detalle)
 
     db.flush()
-    db_cot.subtotal, db_cot.iva, db_cot.total = _calcular_totales(db_cot, bool(db_cot.con_factura))
+    db_cot.subtotal, db_cot.iva, _, db_cot.total = _calcular_totales(db_cot, bool(db_cot.con_factura))
 
     db.commit()
     db.refresh(db_cot)
@@ -333,9 +342,10 @@ def convertir_en_venta(db: Session, cotizacion_id: int, payload: ConvertirVentaR
             num_comprobante = payload.num_comprobante or ''
 
         impuesto = IVA_RATE if bool(db_cot.con_factura) else Decimal("0")
+        descuento = _q(db_cot.descuento or Decimal("0"))
 
         subtotal = sum(Decimal(d.cantidad) * Decimal(d.precio_venta) for d in detalles)
-        total = _q(subtotal + (subtotal * impuesto / 100))
+        total = _q(subtotal + (subtotal * impuesto / 100) - (subtotal * descuento / 100))
 
         db_venta = Venta(
             fecha=datetime.combine(db_cot.fecha.date(), datetime.now().time()),
@@ -345,7 +355,7 @@ def convertir_en_venta(db: Session, cotizacion_id: int, payload: ConvertirVentaR
             estado_id=estado_id,
             total=total,
             impuesto=impuesto,
-            descuento=Decimal("0"),
+            descuento=descuento,
             usuario_id=usuario_id,
             activo=1 if estado_id == 3 else 0,
         )

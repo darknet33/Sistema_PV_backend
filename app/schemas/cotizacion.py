@@ -30,8 +30,10 @@ class CotizacionBase(BaseModel):
     con_factura: bool = False
     incluir_imagenes: bool = False
     modalidad_pago: str = ""
+    forma_pago: str = ""
     validez_dias: int = Field(default=15, ge=1)
     terminos_condiciones: str = ""
+    descuento: Decimal = Field(default=0, ge=0)
     detalles: List[CotizacionDetalleCreate]
 
 class CotizacionCreate(CotizacionBase):
@@ -43,8 +45,10 @@ class CotizacionUpdate(BaseModel):
     con_factura: Optional[bool] = None
     incluir_imagenes: Optional[bool] = None
     modalidad_pago: Optional[str] = None
+    forma_pago: Optional[str] = None
     validez_dias: Optional[int] = Field(default=None, ge=1)
     terminos_condiciones: Optional[str] = None
+    descuento: Optional[Decimal] = Field(default=None, ge=0)
     detalles: Optional[List[CotizacionDetalleCreate]] = None
 
 class CotizacionResponse(BaseModel):
@@ -61,10 +65,12 @@ class CotizacionResponse(BaseModel):
     con_factura: bool
     incluir_imagenes: bool
     modalidad_pago: str
+    forma_pago: str
     validez_dias: int
     terminos_condiciones: str
     subtotal: Decimal
     iva: Decimal
+    descuento: Decimal
     total: Decimal
     activo: bool
     usuario_id: int

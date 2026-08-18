@@ -9,10 +9,16 @@ import io
 router = APIRouter()
 
 @router.get("/kardex/{producto_id}")
-def get_kardex(producto_id: int, fecha_inicio: datetime, fecha_fin: datetime, db: Session = Depends(get_db)):
+def get_kardex(producto_id: int, fecha_inicio: Optional[datetime] = None, fecha_fin: Optional[datetime] = None, db: Session = Depends(get_db)):
+    from app.models.producto import Producto
+    producto = db.query(Producto).filter(Producto.id == producto_id).first()
+    if not producto:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    fi = fecha_inicio or (producto.fecha_registro or datetime(2000, 1, 1))
+    ff = fecha_fin or datetime.now()
     try:
         from app.reports.kardex import generar_kardex
-        buffer = generar_kardex(db, producto_id, fecha_inicio, fecha_fin)
+        buffer = generar_kardex(db, producto_id, fi, ff)
         return StreamingResponse(
             buffer,
             media_type='application/pdf',
@@ -20,6 +26,14 @@ def get_kardex(producto_id: int, fecha_inicio: datetime, fecha_fin: datetime, db
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/kardex/{producto_id}/movimientos")
+def get_kardex_movimientos(producto_id: int, fecha_inicio: Optional[datetime] = None, fecha_fin: Optional[datetime] = None, db: Session = Depends(get_db)):
+    from app.services.kardex import obtener_kardex
+    resultado = obtener_kardex(db, producto_id, fecha_inicio, fecha_fin)
+    if not resultado:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return resultado
 
 @router.get("/ventas/pdf")
 def reporte_ventas_pdf(fecha_inicio: datetime, fecha_fin: datetime, cliente_text: Optional[str] = Query(None), estado_id: Optional[int] = Query(None), db: Session = Depends(get_db)):

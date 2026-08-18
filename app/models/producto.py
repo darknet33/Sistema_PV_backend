@@ -25,6 +25,7 @@ class Producto(BaseModel):
     compras_detalle = relationship("CompraDetalle", back_populates="producto")
     ventas_detalle = relationship("VentaDetalle", back_populates="producto")
     cotizaciones_detalle = relationship("CotizacionDetalle", back_populates="producto")
+    notas_entrega_detalle = relationship("NotaEntregaDetalle", back_populates="producto")
     
     @property
     def usuario_nombre(self):

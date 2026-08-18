@@ -17,3 +17,4 @@ from app.models.venta import Venta
 from app.models.venta_detalle import VentaDetalle
 from app.models.cotizacion import Cotizacion
 from app.models.cotizacion_detalle import CotizacionDetalle
+from app.models.nota_entrega import NotaEntrega, NotaEntregaDetalle

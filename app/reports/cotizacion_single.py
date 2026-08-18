@@ -167,8 +167,20 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellCenter']),
             Paragraph('', styles['CellRight']),
-            Paragraph('IVA (13%):', styles['CellRight']),
+            Paragraph('IVA (16%):', styles['CellRight']),
             Paragraph(f"Bs. {cot.iva:.2f}", styles['CellRight']),
+        ])
+
+    if (cot.descuento or 0) > 0:
+        descuento_monto = cot.subtotal * cot.descuento / 100
+        data.append([
+            Paragraph('', styles['CellCenter']),
+            Paragraph('', styles['CellWrap']),
+            Paragraph('', styles['CellWrap']),
+            Paragraph('', styles['CellCenter']),
+            Paragraph('', styles['CellRight']),
+            Paragraph(f"DESCUENTO ({cot.descuento}%):", styles['CellRight']),
+            Paragraph(f"- Bs. {descuento_monto:.2f}", styles['CellRight']),
         ])
 
     data.append([
@@ -208,6 +220,8 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
 
     if cot.modalidad_pago:
         elements.append(Paragraph(f"<b>Modalidad de pago:</b> {escape(cot.modalidad_pago)}", styles['TermBody']))
+    if cot.forma_pago:
+        elements.append(Paragraph(f"<b>Forma de pago:</b> {escape(cot.forma_pago)}", styles['TermBody']))
     elements.append(Paragraph(f"<b>Validez de la oferta:</b> {cot.validez_dias} día(s) - Vence el {cot.fecha_vencimiento.strftime('%d/%m/%Y')}", styles['TermBody']))
     if cot.terminos_condiciones:
         elements.append(Spacer(1, 6))

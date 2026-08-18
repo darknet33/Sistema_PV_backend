@@ -22,3 +22,4 @@ class Venta(BaseModel):
     estado = relationship("Estado", back_populates="ventas")
     usuario = relationship("Usuario", back_populates="ventas")
     detalles = relationship("VentaDetalle", back_populates="venta")
+    notas_entrega = relationship("NotaEntrega", back_populates="venta")

@@ -61,6 +61,7 @@ class VentaResponse(BaseModel):
     activo: bool
     usuario_id: int
     usuario_username: str = ""
+    usuario_nombre_completo: str = ""
     fecha_registro: datetime
     detalles: List[VentaDetalleResponse]
 

@@ -18,3 +18,4 @@ class Usuario(BaseModel):
     compras = relationship("Compra", back_populates="usuario")
     ventas = relationship("Venta", back_populates="usuario")
     cotizaciones = relationship("Cotizacion", back_populates="usuario")
+    notas_entrega = relationship("NotaEntrega", back_populates="usuario")

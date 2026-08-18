@@ -164,9 +164,9 @@ Prefijo general `/api` (definido en `app/api/__init__.py`).
 - Número auto-generado: `COT-{id:06d}` (p. ej. `COT-000042`).
 - Fechas: el frontend envía solo fecha; el backend asigna hora actual (`datetime.combine(fecha.date(), datetime.now().time())`).
 - Detalle: cada línea guarda `cantidad`, `costo`, `utilidad_pct` y `precio_venta` calculado = `costo + (costo * utilidad_pct / 100)` redondeado a 2 decimales.
-- Totales: `subtotal = Σ cantidad * precio_venta`; `iva = subtotal * 13%` si `con_factura`; `total = subtotal + iva`.
+- Totales: `subtotal = Σ cantidad * precio_venta`; `iva = subtotal * 16%` si `con_factura`; `descuento = subtotal * descuento%`; `total = subtotal + iva - descuento`.
 - `validez_dias` por defecto 15 → `fecha_vencimiento = fecha + validez_dias`.
-- `convertir-venta` (body `ConvertirVentaRequest`): solo cotizaciones `Confirmado` y sin `venta_id`. Valida stock (`_validar_stock_para_venta`), crea la `Venta` con `num_comprobante` auto (8 dígitos, con `with_for_update` en `Comprobante.numero`) o manual (`automatico=false`), descuenta stock por detalle (`_update_stock`), y enlaza `cotizacion.venta_id`. IVA 13% si `con_factura`. Crea el estado `Pendiente` si falta.
+- `convertir-venta` (body `ConvertirVentaRequest`): solo cotizaciones `Confirmado` y sin `venta_id`. Valida stock (`_validar_stock_para_venta`), crea la `Venta` con `num_comprobante` auto (8 dígitos, con `with_for_update` en `Comprobante.numero`) o manual (`automatico=false`), descuenta stock por detalle (`_update_stock`), y enlaza `cotizacion.venta_id`. IVA 16% si `con_factura`. El descuento de la cotización se traslada a la venta. Crea el estado `Pendiente` si falta.
 - Las respuestas incluyen `usuario_username`, datos del cliente (razón social, nit, celular, dirección) y producto (nombre, código, categoría, imagen).
 
 ### Reportes (`/api/reportes`)
