@@ -45,6 +45,10 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.execute("INSERT INTO categorias_gastos(nombre, activo) VALUES ('Alquiler', 1), ('Servicios Básicos', 1), ('Salarios', 1), ('Transporte', 1), ('Otros', 1)")
+    op.execute("INSERT IGNORE INTO modulos(nombre, activo) VALUES ('Gastos', 1)")
+    op.execute("INSERT IGNORE INTO rol_modulo (rol_id, modulo_id) SELECT 1, id FROM modulos WHERE nombre = 'Gastos'")
+    op.execute("INSERT IGNORE INTO modulos(nombre, activo) VALUES ('Modulos', 1)")
+    op.execute("INSERT IGNORE INTO rol_modulo (rol_id, modulo_id) SELECT 1, id FROM modulos WHERE nombre = 'Modulos'")
 
 
 def downgrade() -> None:
