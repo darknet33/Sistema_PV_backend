@@ -6,6 +6,7 @@ from app.database import get_db
 from app.schemas.compra import CompraCreate, CompraUpdate, CompraResponse
 from app.crud.compra import get_compras, get_compra, create_compra, update_compra, delete_compra, anular_compra
 from app.ws import broadcast_multiple_sync
+from app.auth import get_current_user_full
 
 router = APIRouter()
 
@@ -21,8 +22,8 @@ def read_compra(compra_id: int, db: Session = Depends(get_db)):
     return db_compra
 
 @router.post("/", response_model=CompraResponse)
-def create_compra_endpoint(compra: CompraCreate, db: Session = Depends(get_db)):
-    result = create_compra(db, compra, usuario_id=1)
+def create_compra_endpoint(compra: CompraCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user_full)):
+    result = create_compra(db, compra, usuario_id=current_user.id)
     broadcast_multiple_sync(["compras", "dashboard", "reportes"], {"type": "created", "room": "compras"})
     return result
 

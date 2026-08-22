@@ -61,6 +61,19 @@ def reporte_compras_pdf(fecha_inicio: datetime, fecha_fin: datetime, proveedor_t
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/gastos/pdf")
+def reporte_gastos_pdf(fecha_inicio: datetime, fecha_fin: datetime, categoria_id: Optional[int] = Query(None), estado_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
+    try:
+        from app.reports.gastos import generar_reporte_gastos
+        buffer = generar_reporte_gastos(db, fecha_inicio, fecha_fin, categoria_id, estado_id)
+        return StreamingResponse(
+            buffer,
+            media_type='application/pdf',
+            headers={'Content-Disposition': 'attachment; filename=reporte_gastos.pdf'}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/resumen/ventas")
 def resumen_ventas_json(fecha_inicio: datetime, fecha_fin: datetime, cliente_text: Optional[str] = Query(None), estado_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
     from app.services.reportes import resumen_ventas

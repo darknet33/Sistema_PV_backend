@@ -94,3 +94,27 @@ CREATE TABLE detalles_venta (
   FOREIGN KEY (venta_id) REFERENCES ventas(id),
   FOREIGN KEY (producto_id) REFERENCES productos(id)
 );
+
+CREATE TABLE categorias_gastos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(100) NOT NULL UNIQUE,
+  activo TINYINT(1) DEFAULT 1,
+  fecha_registro DATETIME DEFAULT NOW(),
+  fecha_actualizado DATETIME DEFAULT NOW() ON UPDATE NOW()
+);
+
+CREATE TABLE gastos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  fecha DATETIME NOT NULL,
+  categoria_gasto_id INT NOT NULL,
+  descripcion TEXT,
+  monto DECIMAL(10,2) NOT NULL,
+  estado_id INT,
+  usuario_id INT,
+  activo TINYINT(1) DEFAULT 1,
+  fecha_registro DATETIME DEFAULT NOW(),
+  fecha_actualizado DATETIME DEFAULT NOW() ON UPDATE NOW(),
+  FOREIGN KEY (categoria_gasto_id) REFERENCES categorias_gastos(id),
+  FOREIGN KEY (estado_id) REFERENCES estados(id),
+  FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+);

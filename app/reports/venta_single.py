@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 import io
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -14,7 +14,6 @@ def generar_comprobante_venta(db: Session, venta_id: int):
     from app.models.comprobante import Comprobante
     from app.models.estado import Estado
     from app.models.producto import Producto
-    from app.models.categoria import Categoria
 
     venta = db.query(Venta).filter(Venta.id == venta_id).first()
     if not venta:
@@ -23,7 +22,9 @@ def generar_comprobante_venta(db: Session, venta_id: int):
     cliente = db.query(Cliente).filter(Cliente.id == venta.cliente_id).first()
     comprobante = db.query(Comprobante).filter(Comprobante.id == venta.comprobante_id).first()
     estado = db.query(Estado).filter(Estado.id == venta.estado_id).first()
-    detalles = db.query(VentaDetalle).filter(VentaDetalle.venta_id == venta_id).all()
+    detalles = db.query(VentaDetalle).options(
+        selectinload(VentaDetalle.producto).selectinload(Producto.categoria)
+    ).filter(VentaDetalle.venta_id == venta_id).all()
 
     buffer = io.BytesIO()
     logo_path, logo_h = get_logo_header_info(db)
@@ -61,6 +62,8 @@ def generar_comprobante_venta(db: Session, venta_id: int):
         [f"Cliente: {cliente.nombre if cliente else '-'}", ""],
         [f"Estado: {estado.nombre if estado else '-'}", (f"Incluye IVA {venta.impuesto}%" if (venta.impuesto or 0) > 0 else "")],
     ]
+    if (venta.it or 0) > 0:
+        info_data[2][1] += f" + IT {venta.it}%"
     info_table = Table(info_data, colWidths=[3*inch, 3*inch])
     info_table.setStyle(TableStyle([
         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
@@ -88,12 +91,11 @@ def generar_comprobante_venta(db: Session, venta_id: int):
     ]
     subtotal_total = 0
     for i, d in enumerate(detalles, start=1):
-        prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
-        cat_nombre = ''
-        if prod:
-            cat = db.query(Categoria).filter(Categoria.id == prod.categoria_id).first()
-            cat_nombre = cat.nombre if cat else ''
-        prod_nombre = f"{cat_nombre} - {prod.descripcion}" if cat_nombre and prod else (prod.descripcion if prod else '-')
+        prod = d.producto
+        cat_nombre = ""
+        if prod and prod.categoria:
+            cat_nombre = prod.categoria.nombre
+        prod_nombre = f"{cat_nombre} - {prod.descripcion} - {prod.marca}" + (f" - {prod.procedencia}" if prod.procedencia else "") if cat_nombre and prod else (prod.descripcion if prod else '-')
         subtotal = d.cantidad * d.precio
         subtotal_total += subtotal
         data.append([
@@ -106,8 +108,9 @@ def generar_comprobante_venta(db: Session, venta_id: int):
         ])
 
     impuesto_monto = subtotal_total * (venta.impuesto or 0) / 100
+    it_monto = subtotal_total * (venta.it or 0) / 100
     descuento_monto = subtotal_total * (venta.descuento or 0) / 100
-    total = subtotal_total + impuesto_monto - descuento_monto
+    total = subtotal_total + impuesto_monto + it_monto - descuento_monto
 
     table = Table(data, colWidths=[0.4*inch, 0.8*inch, 2.6*inch, 0.6*inch, 1.0*inch, 1.0*inch])
     table.setStyle(TableStyle([
@@ -137,6 +140,11 @@ def generar_comprobante_venta(db: Session, venta_id: int):
         tot_rows.append([
             Paragraph(f'IVA ({venta.impuesto}%)', styles['TotLabel']),
             Paragraph(f"Bs. {impuesto_monto:.2f}", styles['TotValue']),
+        ])
+    if (venta.it or 0) > 0:
+        tot_rows.append([
+            Paragraph(f'IT ({venta.it}%)', styles['TotLabel']),
+            Paragraph(f"Bs. {it_monto:.2f}", styles['TotValue']),
         ])
     if (venta.descuento or 0) > 0:
         tot_rows.append([

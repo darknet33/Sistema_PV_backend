@@ -13,6 +13,7 @@ class Venta(BaseModel):
     estado_id = Column(Integer, ForeignKey("estados.id"))
     total = Column(DECIMAL(10, 2))
     impuesto = Column(DECIMAL(10, 2), default=0)
+    it = Column(DECIMAL(10, 2), default=0)
     descuento = Column(DECIMAL(10, 2), default=0)
     activo = Column(Boolean, default=0)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))

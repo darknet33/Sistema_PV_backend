@@ -100,7 +100,7 @@ def generar_pdf_nota_entrega(db: Session, nota_id: int):
         if prod:
             cat = db.query(Categoria).filter(Categoria.id == prod.categoria_id).first()
             cat_nombre = cat.nombre if cat else ''
-        prod_nombre = f"{cat_nombre} - {prod.descripcion}" if cat_nombre and prod else (prod.descripcion if prod else '-')
+        prod_nombre = f"{cat_nombre} - {prod.descripcion} - {prod.marca}" + (f" - {prod.procedencia}" if prod.procedencia else "") if cat_nombre and prod else (prod.descripcion if prod else '-')
         total_cantidad += d.cantidad
         data.append([
             Paragraph(str(i), styles['CellCenter']),

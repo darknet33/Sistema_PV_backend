@@ -12,6 +12,7 @@ class CotizacionDetalle(Base):
     costo = Column(DECIMAL(10, 2), nullable=False, default=0)
     utilidad_pct = Column(DECIMAL(10, 2), nullable=False, default=0)
     precio_venta = Column(DECIMAL(10, 2), nullable=False, default=0)
+    dias_disponibilidad = Column(Integer, nullable=True)
 
     cotizacion = relationship("Cotizacion", back_populates="detalles")
     producto = relationship("Producto", back_populates="cotizaciones_detalle")

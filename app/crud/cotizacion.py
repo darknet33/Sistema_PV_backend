@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from fastapi import HTTPException
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
@@ -8,7 +8,6 @@ from app.models.cotizacion import Cotizacion
 from app.models.cotizacion_detalle import CotizacionDetalle
 from app.models.producto import Producto
 from app.models.cliente import Cliente
-from app.models.categoria import Categoria
 from app.models.usuario import Usuario
 from app.models.comprobante import Comprobante
 from app.models.estado import Estado
@@ -17,7 +16,8 @@ from app.models.venta_detalle import VentaDetalle
 from app.schemas.cotizacion import CotizacionCreate, CotizacionUpdate, ConvertirVentaRequest
 from app.crud.venta import _validar_stock_para_venta, _update_stock
 
-IVA_RATE = Decimal("16")
+IVA_RATE = Decimal("13")
+IT_RATE = Decimal("3")
 ESTADO_ENVIADO = "Enviado"
 ESTADO_CONFIRMADO = "Confirmado"
 ESTADO_VENCIDO = "Vencido"
@@ -73,15 +73,17 @@ def _get_estado_por_nombre(db: Session, nombre: str):
 
 
 def _build_response(db: Session, cot: Cotizacion):
-    detalles = db.query(CotizacionDetalle).filter(CotizacionDetalle.cotizacion_id == cot.id).all()
+    detalles = db.query(CotizacionDetalle).options(
+        selectinload(CotizacionDetalle.producto)
+    ).filter(CotizacionDetalle.cotizacion_id == cot.id).all()
 
     detalles_response = []
     for d in detalles:
-        prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
+        prod = d.producto
         cat_nombre = ""
-        if prod:
-            cat = db.query(Categoria).filter(Categoria.id == prod.categoria_id).first()
-            cat_nombre = cat.nombre if cat else ""
+        if prod and prod.categoria:
+            cat_nombre = prod.categoria.nombre
+        stock_actual = prod.stock_actual if prod else 0
         detalles_response.append({
             "id": d.id,
             "producto_id": d.producto_id,
@@ -93,6 +95,8 @@ def _build_response(db: Session, cot: Cotizacion):
             "costo": d.costo,
             "utilidad_pct": d.utilidad_pct,
             "precio_venta": d.precio_venta,
+            "stock_actual": stock_actual,
+            "dias_disponibilidad": d.dias_disponibilidad,
         })
 
     usuario = db.query(Usuario).filter(Usuario.id == cot.usuario_id).first()
@@ -116,6 +120,7 @@ def _build_response(db: Session, cot: Cotizacion):
         "terminos_condiciones": cot.terminos_condiciones or "",
         "subtotal": cot.subtotal or 0,
         "iva": cot.iva or 0,
+        "it": cot.it or 0,
         "descuento": cot.descuento or 0,
         "total": cot.total or 0,
         "activo": bool(cot.activo),
@@ -147,9 +152,10 @@ def _calcular_totales(cot, con_factura: bool):
         subtotal += Decimal(d.cantidad) * Decimal(d.precio_venta)
     subtotal = _q(subtotal)
     iva = _q(subtotal * IVA_RATE / 100) if con_factura else Decimal("0.00")
+    it = _q(subtotal * IT_RATE / 100) if con_factura else Decimal("0.00")
     descuento_monto = _q(subtotal * (cot.descuento or 0) / 100)
-    total = _q(subtotal + iva - descuento_monto)
-    return subtotal, iva, descuento_monto, total
+    total = _q(subtotal + iva + it - descuento_monto)
+    return subtotal, iva, it, descuento_monto, total
 
 
 def _fecha_hora(fecha: datetime) -> datetime:
@@ -200,11 +206,12 @@ def create_cotizacion(db: Session, cot: CotizacionCreate, usuario_id: int):
             costo=_q(detalle.costo),
             utilidad_pct=_q(detalle.utilidad_pct),
             precio_venta=_precio_venta(detalle.costo, detalle.utilidad_pct),
+            dias_disponibilidad=detalle.dias_disponibilidad,
         )
         db.add(db_detalle)
 
     db.flush()
-    db_cot.subtotal, db_cot.iva, _, db_cot.total = _calcular_totales(db_cot, bool(cot.con_factura))
+    db_cot.subtotal, db_cot.iva, db_cot.it, _, db_cot.total = _calcular_totales(db_cot, bool(cot.con_factura))
 
     db.commit()
     db.refresh(db_cot)
@@ -262,11 +269,12 @@ def update_cotizacion(db: Session, cotizacion_id: int, cot: CotizacionUpdate):
                 costo=_q(detalle.costo),
                 utilidad_pct=_q(detalle.utilidad_pct),
                 precio_venta=_precio_venta(detalle.costo, detalle.utilidad_pct),
+                dias_disponibilidad=detalle.dias_disponibilidad,
             )
             db.add(db_detalle)
 
     db.flush()
-    db_cot.subtotal, db_cot.iva, _, db_cot.total = _calcular_totales(db_cot, bool(db_cot.con_factura))
+    db_cot.subtotal, db_cot.iva, db_cot.it, _, db_cot.total = _calcular_totales(db_cot, bool(db_cot.con_factura))
 
     db.commit()
     db.refresh(db_cot)
@@ -342,10 +350,11 @@ def convertir_en_venta(db: Session, cotizacion_id: int, payload: ConvertirVentaR
             num_comprobante = payload.num_comprobante or ''
 
         impuesto = IVA_RATE if bool(db_cot.con_factura) else Decimal("0")
+        it = IT_RATE if bool(db_cot.con_factura) else Decimal("0")
         descuento = _q(db_cot.descuento or Decimal("0"))
 
         subtotal = sum(Decimal(d.cantidad) * Decimal(d.precio_venta) for d in detalles)
-        total = _q(subtotal + (subtotal * impuesto / 100) - (subtotal * descuento / 100))
+        total = _q(subtotal + (subtotal * impuesto / 100) + (subtotal * it / 100) - (subtotal * descuento / 100))
 
         db_venta = Venta(
             fecha=datetime.combine(db_cot.fecha.date(), datetime.now().time()),
@@ -355,6 +364,7 @@ def convertir_en_venta(db: Session, cotizacion_id: int, payload: ConvertirVentaR
             estado_id=estado_id,
             total=total,
             impuesto=impuesto,
+            it=it,
             descuento=descuento,
             usuario_id=usuario_id,
             activo=1 if estado_id == 3 else 0,

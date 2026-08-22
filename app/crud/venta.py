@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from fastapi import HTTPException
 from datetime import datetime, date
 from app.models.venta import Venta
@@ -7,7 +7,6 @@ from app.models.producto import Producto
 from app.models.cliente import Cliente
 from app.models.comprobante import Comprobante
 from app.models.estado import Estado
-from app.models.categoria import Categoria
 from app.models.usuario import Usuario
 from app.schemas.venta import VentaCreate, VentaUpdate
 
@@ -61,15 +60,16 @@ def _build_response(db: Session, venta: Venta):
     cliente = db.query(Cliente).filter(Cliente.id == venta.cliente_id).first()
     comprobante = db.query(Comprobante).filter(Comprobante.id == venta.comprobante_id).first()
     estado = db.query(Estado).filter(Estado.id == venta.estado_id).first()
-    detalles = db.query(VentaDetalle).filter(VentaDetalle.venta_id == venta.id).all()
+    detalles = db.query(VentaDetalle).options(
+        selectinload(VentaDetalle.producto)
+    ).filter(VentaDetalle.venta_id == venta.id).all()
 
     detalles_response = []
     for d in detalles:
-        prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
+        prod = d.producto
         cat_nombre = ""
-        if prod:
-            cat = db.query(Categoria).filter(Categoria.id == prod.categoria_id).first()
-            cat_nombre = cat.nombre if cat else ""
+        if prod and prod.categoria:
+            cat_nombre = prod.categoria.nombre
         detalles_response.append({
             "id": d.id,
             "producto_id": d.producto_id,
@@ -98,6 +98,7 @@ def _build_response(db: Session, venta: Venta):
         "estado_nombre": estado.nombre if estado else "",
         "total": venta.total or 0,
         "impuesto": venta.impuesto or 0,
+        "it": venta.it or 0,
         "descuento": venta.descuento or 0,
         "activo": bool(venta.activo),
         "usuario_id": venta.usuario_id,
@@ -122,7 +123,10 @@ def create_venta(db: Session, venta: VentaCreate, usuario_id: int):
     _validar_stock_para_venta(db, venta.detalles)
 
     subtotal = sum(d.cantidad * d.precio for d in venta.detalles)
-    total = subtotal + (subtotal * (venta.impuesto or 0) / 100) - (subtotal * (venta.descuento or 0) / 100)
+    impuesto = Decimal(venta.impuesto or 0)
+    it = Decimal(venta.it or 0)
+    descuento = Decimal(venta.descuento or 0)
+    total = subtotal + (subtotal * impuesto / 100) + (subtotal * it / 100) - (subtotal * descuento / 100)
 
     if getattr(venta, 'automatico', True):
         comprobante = db.query(Comprobante).filter(Comprobante.id == venta.comprobante_id).with_for_update().first()
@@ -142,6 +146,7 @@ def create_venta(db: Session, venta: VentaCreate, usuario_id: int):
         estado_id=venta.estado_id,
         total=total,
         impuesto=venta.impuesto or 0,
+        it=venta.it or 0,
         descuento=venta.descuento or 0,
         usuario_id=usuario_id,
         activo=1 if venta.estado_id == 3 else 0
@@ -190,6 +195,8 @@ def update_venta(db: Session, venta_id: int, venta: VentaUpdate):
         db_venta.activo = 1 if venta.estado_id == 3 else 0
     if venta.impuesto is not None:
         db_venta.impuesto = venta.impuesto
+    if venta.it is not None:
+        db_venta.it = venta.it
     if venta.descuento is not None:
         db_venta.descuento = venta.descuento
 
@@ -201,7 +208,10 @@ def update_venta(db: Session, venta_id: int, venta: VentaUpdate):
         db.query(VentaDetalle).filter(VentaDetalle.venta_id == venta_id).delete()
 
         subtotal = sum(d.cantidad * d.precio for d in detalles_data)
-        db_venta.total = subtotal + (subtotal * (db_venta.impuesto or 0) / 100) - (subtotal * (db_venta.descuento or 0) / 100)
+        impuesto = Decimal(db_venta.impuesto or 0)
+        it = Decimal(db_venta.it or 0)
+        descuento = Decimal(db_venta.descuento or 0)
+        db_venta.total = subtotal + (subtotal * impuesto / 100) + (subtotal * it / 100) - (subtotal * descuento / 100)
 
         for detalle in detalles_data:
             db_detalle = VentaDetalle(
@@ -215,7 +225,10 @@ def update_venta(db: Session, venta_id: int, venta: VentaUpdate):
             _update_stock(db, detalle.producto_id, detalle.cantidad, sumar=False)
     else:
         subtotal = sum(d.cantidad * d.precio for d in db.query(VentaDetalle).filter(VentaDetalle.venta_id == venta_id).all())
-        db_venta.total = subtotal + (subtotal * (db_venta.impuesto or 0) / 100) - (subtotal * (db_venta.descuento or 0) / 100)
+        impuesto = Decimal(db_venta.impuesto or 0)
+        it = Decimal(db_venta.it or 0)
+        descuento = Decimal(db_venta.descuento or 0)
+        db_venta.total = subtotal + (subtotal * impuesto / 100) + (subtotal * it / 100) - (subtotal * descuento / 100)
 
     db.commit()
     db.refresh(db_venta)

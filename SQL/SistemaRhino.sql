@@ -163,6 +163,30 @@ CREATE TABLE detalles_venta (
   FOREIGN KEY (producto_id) REFERENCES productos(id)
 );
 
+CREATE TABLE IF NOT EXISTS categorias_gastos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(100) NOT NULL UNIQUE,
+  activo TINYINT(1) DEFAULT 1,
+  fecha_registro DATETIME DEFAULT NOW(),
+  fecha_actualizado DATETIME DEFAULT NOW() ON UPDATE NOW()
+);
+
+CREATE TABLE IF NOT EXISTS gastos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  fecha DATETIME NOT NULL,
+  categoria_gasto_id INT NOT NULL,
+  descripcion TEXT,
+  monto DECIMAL(10,2) NOT NULL,
+  estado_id INT,
+  usuario_id INT,
+  activo TINYINT(1) DEFAULT 1,
+  fecha_registro DATETIME DEFAULT NOW(),
+  fecha_actualizado DATETIME DEFAULT NOW() ON UPDATE NOW(),
+  FOREIGN KEY (categoria_gasto_id) REFERENCES categorias_gastos(id),
+  FOREIGN KEY (estado_id) REFERENCES estados(id),
+  FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+);
+
 -- ================================================
 -- TRIGGERS
 -- ================================================
@@ -502,6 +526,13 @@ INSERT INTO transacciones(nombre) VALUES
 
 
 INSERT INTO categorias(nombre) VALUES ('MATERIA PRIMA'), ('HERRAMIENTAS');
+
+INSERT INTO categorias_gastos(nombre, activo) VALUES
+('Alquiler', 1),
+('Servicios Básicos', 1),
+('Salarios', 1),
+('Transporte', 1),
+('Otros', 1);
 
 INSERT INTO productos(codigo, categoria_id, descripcion, marca, procedencia, peso, stock_inicial, stock_actual, stock_minimo, usuario_id) VALUES
 ('P001', 1, 'Tornillo de acero', 'ACME', 'Brasil', '0.5kg', 100, 100, 10, 1),

@@ -57,6 +57,7 @@ class VentaResponse(BaseModel):
     estado_nombre: str
     total: Decimal
     impuesto: Decimal
+    it: Decimal = Decimal("0")
     descuento: Decimal
     activo: bool
     usuario_id: int

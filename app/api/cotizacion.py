@@ -6,6 +6,7 @@ from app.database import get_db
 from app.schemas.cotizacion import CotizacionCreate, CotizacionUpdate, CotizacionResponse, ConvertirVentaRequest
 from app.crud.cotizacion import get_cotizaciones, get_cotizacion, create_cotizacion, update_cotizacion, confirmar_cotizacion, delete_cotizacion, convertir_en_venta
 from app.ws import broadcast_multiple_sync
+from app.auth import get_current_user_full
 
 router = APIRouter()
 
@@ -24,8 +25,8 @@ def read_cotizacion(cotizacion_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=CotizacionResponse)
-def create_cotizacion_endpoint(cotizacion: CotizacionCreate, db: Session = Depends(get_db)):
-    result = create_cotizacion(db, cotizacion, usuario_id=1)
+def create_cotizacion_endpoint(cotizacion: CotizacionCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user_full)):
+    result = create_cotizacion(db, cotizacion, usuario_id=current_user.id)
     broadcast_multiple_sync(["cotizaciones"], {"type": "created", "room": "cotizaciones"})
     return result
 
@@ -58,9 +59,9 @@ def delete_cotizacion_endpoint(cotizacion_id: int, db: Session = Depends(get_db)
 
 
 @router.post("/{cotizacion_id}/convertir-venta")
-def convertir_venta_endpoint(cotizacion_id: int, payload: ConvertirVentaRequest, db: Session = Depends(get_db)):
+def convertir_venta_endpoint(cotizacion_id: int, payload: ConvertirVentaRequest, db: Session = Depends(get_db), current_user=Depends(get_current_user_full)):
     from app.schemas.venta import VentaResponse
-    result = convertir_en_venta(db, cotizacion_id, payload, usuario_id=1)
+    result = convertir_en_venta(db, cotizacion_id, payload, usuario_id=current_user.id)
     if not result:
         raise HTTPException(status_code=404, detail="Cotización not found")
     broadcast_multiple_sync(["cotizaciones", "ventas", "dashboard", "reportes"], {"type": "created", "room": "ventas"})

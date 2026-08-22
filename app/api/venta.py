@@ -7,6 +7,7 @@ from app.schemas.venta import VentaCreate, VentaUpdate, VentaResponse
 from app.crud.venta import get_ventas, get_venta, create_venta, update_venta, anular_venta, delete_venta
 from app.ws import broadcast_multiple_sync
 from datetime import datetime
+from app.auth import get_current_user_full
 
 router = APIRouter()
 
@@ -22,8 +23,8 @@ def read_venta(venta_id: int, db: Session = Depends(get_db)):
     return db_venta
 
 @router.post("/", response_model=VentaResponse)
-def create_venta_endpoint(venta: VentaCreate, db: Session = Depends(get_db)):
-    result = create_venta(db, venta, usuario_id=1)
+def create_venta_endpoint(venta: VentaCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user_full)):
+    result = create_venta(db, venta, usuario_id=current_user.id)
     broadcast_multiple_sync(["ventas", "dashboard", "reportes"], {"type": "created", "room": "ventas"})
     return result
 

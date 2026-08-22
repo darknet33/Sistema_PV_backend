@@ -78,7 +78,7 @@ def generar_comprobante_compra(db: Session, compra_id: int):
         if prod:
             cat = db.query(Categoria).filter(Categoria.id == prod.categoria_id).first()
             cat_nombre = cat.nombre if cat else ''
-        prod_nombre = f"{cat_nombre} - {prod.descripcion}" if cat_nombre and prod else (prod.descripcion if prod else '-')
+        prod_nombre = f"{cat_nombre} - {prod.descripcion} - {prod.marca}" + (f" - {prod.procedencia}" if prod.procedencia else "") if cat_nombre and prod else (prod.descripcion if prod else '-')
         subtotal = d.cantidad * d.costo
         total += subtotal
         data.append([

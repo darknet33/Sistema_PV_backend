@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 import bcrypt
 from sqlalchemy.orm import Session
+from app.database import get_db
 from app.schemas.token import TokenData
 
 SECRET_KEY = "super-secret-key-change-in-production-2026"
@@ -33,7 +34,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -54,7 +55,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
     return token_data
 
-async def get_current_user_full(db: Session = Depends(lambda: None), token: str = Depends(oauth2_scheme)):
+async def get_current_user_full(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
     from app.crud.usuario import get_usuario_by_username
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

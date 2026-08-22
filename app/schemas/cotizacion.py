@@ -8,6 +8,7 @@ class CotizacionDetalleCreate(BaseModel):
     cantidad: int = Field(ge=1)
     costo: Decimal = Field(ge=0)
     utilidad_pct: Decimal = Field(default=0, ge=0)
+    dias_disponibilidad: Optional[int] = None
 
 class CotizacionDetalleResponse(BaseModel):
     id: int
@@ -20,6 +21,8 @@ class CotizacionDetalleResponse(BaseModel):
     costo: Decimal
     utilidad_pct: Decimal
     precio_venta: Decimal
+    stock_actual: int = 0
+    dias_disponibilidad: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -70,6 +73,7 @@ class CotizacionResponse(BaseModel):
     terminos_condiciones: str
     subtotal: Decimal
     iva: Decimal
+    it: Decimal = Decimal("0")
     descuento: Decimal
     total: Decimal
     activo: bool

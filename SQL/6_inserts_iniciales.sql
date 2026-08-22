@@ -32,6 +32,13 @@ INSERT INTO transacciones(nombre) VALUES
 
 INSERT INTO categorias(nombre) VALUES ('MATERIA PRIMA'), ('HERRAMIENTAS');
 
+INSERT INTO categorias_gastos(nombre, activo) VALUES
+('Alquiler', 1),
+('Servicios Básicos', 1),
+('Salarios', 1),
+('Transporte', 1),
+('Otros', 1);
+
 INSERT INTO productos(codigo, categoria_id, descripcion, marca, precio, peso, stock_inicial, stock_actual, stock_minimo, usuario_id) VALUES
 ('P001', 1, 'Tornillo de acero', 'ACME', 2.00, 0.5, 100, 100, 10, 1),
 ('P002', 2, 'Martillo profesional', 'STANLEY', 8.00, 1.0, 50, 50, 5, 2);

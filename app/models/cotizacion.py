@@ -18,6 +18,7 @@ class Cotizacion(BaseModel):
     terminos_condiciones = Column(Text, nullable=False, default="")
     subtotal = Column(DECIMAL(10, 2), default=0)
     iva = Column(DECIMAL(10, 2), default=0)
+    it = Column(DECIMAL(10, 2), default=0)
     descuento = Column(DECIMAL(10, 2), default=0)
     total = Column(DECIMAL(10, 2), default=0)
     activo = Column(Boolean, default=True)

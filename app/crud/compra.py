@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from fastapi import HTTPException
 from datetime import datetime, date
 from app.models.compra import Compra
@@ -41,15 +41,16 @@ def _build_response(db: Session, compra: Compra):
     proveedor = db.query(Proveedor).filter(Proveedor.id == compra.proveedor_id).first()
     comprobante = db.query(Comprobante).filter(Comprobante.id == compra.comprobante_id).first()
     estado = db.query(Estado).filter(Estado.id == compra.estado_id).first()
-    detalles = db.query(CompraDetalle).filter(CompraDetalle.compra_id == compra.id).all()
+    detalles = db.query(CompraDetalle).options(
+        selectinload(CompraDetalle.producto).selectinload(Producto.categoria)
+    ).filter(CompraDetalle.compra_id == compra.id).all()
 
     detalles_response = []
     for d in detalles:
-        prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
+        prod = d.producto
         cat_nombre = ""
-        if prod:
-            cat = db.query(Categoria).filter(Categoria.id == prod.categoria_id).first()
-            cat_nombre = cat.nombre if cat else ""
+        if prod and prod.categoria:
+            cat_nombre = prod.categoria.nombre
         detalles_response.append({
             "id": d.id,
             "producto_id": d.producto_id,

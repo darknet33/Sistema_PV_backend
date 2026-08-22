@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 import io
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -13,7 +13,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 def _imagen_escalada(url, max_w, max_h):
-    """Devuelve una imagen Reportlab escalada (mantiene proporción) o None."""
     if not url:
         return None
     try:
@@ -35,14 +34,15 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
     from app.models.cotizacion import Cotizacion
     from app.models.cotizacion_detalle import CotizacionDetalle
     from app.models.producto import Producto
-    from app.models.categoria import Categoria
     from app.models.usuario import Usuario
 
     cot = db.query(Cotizacion).filter(Cotizacion.id == cotizacion_id).first()
     if not cot:
         return None
 
-    detalles = db.query(CotizacionDetalle).filter(CotizacionDetalle.cotizacion_id == cotizacion_id).all()
+    detalles = db.query(CotizacionDetalle).options(
+        selectinload(CotizacionDetalle.producto).selectinload(Producto.categoria)
+    ).filter(CotizacionDetalle.cotizacion_id == cotizacion_id).all()
     usuario = db.query(Usuario).filter(Usuario.id == cot.usuario_id).first()
 
     buffer = io.BytesIO()
@@ -106,6 +106,7 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         Paragraph('Costo (Bs.)', styles['HeaderCell']),
         Paragraph('P. Venta (Bs.)', styles['HeaderCell']),
         Paragraph('Subtotal (Bs.)', styles['HeaderCell']),
+        Paragraph('Disponible en', styles['HeaderCell']),
     ]
 
     data = [headers]
@@ -131,13 +132,14 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         return inner
 
     for i, d in enumerate(detalles, start=1):
-        prod = db.query(Producto).filter(Producto.id == d.producto_id).first()
-        cat_nombre = ''
-        if prod:
-            cat = db.query(Categoria).filter(Categoria.id == prod.categoria_id).first()
-            cat_nombre = cat.nombre if cat else ''
-        prod_nombre = f"{cat_nombre} - {prod.descripcion}" if cat_nombre and prod else (prod.descripcion if prod else '-')
+        prod = d.producto
+        cat_nombre = ""
+        if prod and prod.categoria:
+            cat_nombre = prod.categoria.nombre
+        prod_nombre = f"{cat_nombre} - {prod.descripcion} - {prod.marca}" + (f" - {prod.procedencia}" if prod.procedencia else "") if cat_nombre and prod else (prod.descripcion if prod else '-')
         subtotal = d.cantidad * d.precio_venta
+        dias_disp = d.dias_disponibilidad
+        dias_texto = f"{dias_disp} día(s)" if dias_disp is not None else "-"
 
         row = [
             Paragraph(str(i), styles['CellCenter']),
@@ -147,6 +149,7 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
             Paragraph(f"{d.costo:.2f}", styles['CellRight']),
             Paragraph(f"{d.precio_venta:.2f}", styles['CellRight']),
             Paragraph(f"{subtotal:.2f}", styles['CellRight']),
+            Paragraph(dias_texto, styles['CellCenter']),
         ]
         data.append(row)
 
@@ -155,6 +158,7 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         Paragraph('', styles['CellWrap']),
         Paragraph('', styles['CellWrap']),
         Paragraph('', styles['CellCenter']),
+        Paragraph('', styles['CellRight']),
         Paragraph('', styles['CellRight']),
         Paragraph('SUBTOTAL:', styles['CellRight']),
         Paragraph(f"Bs. {cot.subtotal:.2f}", styles['CellRight']),
@@ -167,8 +171,19 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellCenter']),
             Paragraph('', styles['CellRight']),
-            Paragraph('IVA (16%):', styles['CellRight']),
+            Paragraph('', styles['CellRight']),
+            Paragraph('IVA (13%):', styles['CellRight']),
             Paragraph(f"Bs. {cot.iva:.2f}", styles['CellRight']),
+        ])
+        data.append([
+            Paragraph('', styles['CellCenter']),
+            Paragraph('', styles['CellWrap']),
+            Paragraph('', styles['CellWrap']),
+            Paragraph('', styles['CellCenter']),
+            Paragraph('', styles['CellRight']),
+            Paragraph('', styles['CellRight']),
+            Paragraph('IT (3%):', styles['CellRight']),
+            Paragraph(f"Bs. {cot.it:.2f}", styles['CellRight']),
         ])
 
     if (cot.descuento or 0) > 0:
@@ -178,6 +193,7 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellCenter']),
+            Paragraph('', styles['CellRight']),
             Paragraph('', styles['CellRight']),
             Paragraph(f"DESCUENTO ({cot.descuento}%):", styles['CellRight']),
             Paragraph(f"- Bs. {descuento_monto:.2f}", styles['CellRight']),
@@ -189,13 +205,14 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         Paragraph('', styles['CellWrap']),
         Paragraph('', styles['CellCenter']),
         Paragraph('', styles['CellRight']),
+        Paragraph('', styles['CellRight']),
         Paragraph('TOTAL:', styles['CellRight']),
         Paragraph(f"Bs. {cot.total:.2f}", styles['CellRight']),
     ])
 
     primary, secondary = empresa_colors(db)
 
-    col_widths = [0.35 * inch, 0.6 * inch, 2.2 * inch, 0.45 * inch, 0.7 * inch, 0.8 * inch, 0.85 * inch]
+    col_widths = [0.35 * inch, 0.55 * inch, 1.8 * inch, 0.4 * inch, 0.6 * inch, 0.7 * inch, 0.8 * inch, 0.9 * inch]
 
     table = Table(data, colWidths=col_widths)
     table.setStyle(TableStyle([
@@ -204,12 +221,12 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('ALIGN', (1, 1), (1, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('GRID', (0, 0), (-1, -2), 0.5, colors.grey),
-        ('LINEBELOW', (5, -1), (-1, -1), 1, colors.black),
-        ('FONTNAME', (5, -1), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (5, -1), (-1, -1), 11),
+        ('LINEBELOW', (6, -1), (-1, -1), 1, colors.black),
+        ('FONTNAME', (6, -1), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (6, -1), (-1, -1), 10),
         ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f0f0f0')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#f9f9f9')]),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
