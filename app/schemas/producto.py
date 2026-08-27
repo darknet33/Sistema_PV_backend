@@ -1,7 +1,8 @@
 from pydantic import BaseModel
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
+from app.schemas.producto_unidad import ProductoUnidadCreate, ProductoUnidadResponse
 
 class ProductoBase(BaseModel):
     codigo: str
@@ -19,7 +20,7 @@ class ProductoBase(BaseModel):
     usuario_id: int
 
 class ProductoCreate(ProductoBase):
-    pass
+    unidades: Optional[List[ProductoUnidadCreate]] = None
 
 class ProductoUpdate(BaseModel):
     categoria_id: Optional[int] = None
@@ -32,6 +33,7 @@ class ProductoUpdate(BaseModel):
     stock_maximo: Optional[int] = None
     imagen: Optional[str] = None
     activo: Optional[bool] = None
+    unidades: Optional[List[ProductoUnidadCreate]] = None
 
 class ProductoResponse(BaseModel):
     id: int
@@ -52,5 +54,7 @@ class ProductoResponse(BaseModel):
     fecha_registro: datetime
     fecha_actualizado: Optional[datetime] = None
     usuario_nombre: str = ""
-    
+    unidades: List[ProductoUnidadResponse] = []
+    unidad_principal: Optional[ProductoUnidadResponse] = None
+
     model_config = {"from_attributes": True}

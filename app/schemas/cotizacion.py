@@ -5,10 +5,10 @@ from typing import List, Optional
 
 class CotizacionDetalleCreate(BaseModel):
     producto_id: int
-    cantidad: int = Field(ge=1)
+    unidad_id: Optional[int] = None
+    cantidad: Decimal = Field(ge=Decimal("0.01"))
     costo: Decimal = Field(ge=0)
     utilidad_pct: Decimal = Field(default=0, ge=0)
-    dias_disponibilidad: Optional[int] = None
 
 class CotizacionDetalleResponse(BaseModel):
     id: int
@@ -17,12 +17,17 @@ class CotizacionDetalleResponse(BaseModel):
     producto_codigo: str
     producto_categoria: str
     producto_imagen: Optional[str] = None
-    cantidad: int
+    unidad_id: Optional[int] = None
+    unidad_nombre: str = ""
+    unidad_abreviatura: str = ""
+    es_principal: bool = True
+    factor_conversion: Decimal = Decimal("1")
+    cantidad: Decimal
     costo: Decimal
     utilidad_pct: Decimal
     precio_venta: Decimal
     stock_actual: int = 0
-    dias_disponibilidad: Optional[int] = None
+    cantidad_principal: Decimal = Decimal("1")
 
     class Config:
         from_attributes = True

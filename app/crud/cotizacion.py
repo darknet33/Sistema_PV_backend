@@ -13,6 +13,8 @@ from app.models.comprobante import Comprobante
 from app.models.estado import Estado
 from app.models.venta import Venta
 from app.models.venta_detalle import VentaDetalle
+from app.models.producto_unidad import ProductoUnidad
+from app.models.unidad_medida import UnidadMedida
 from app.schemas.cotizacion import CotizacionCreate, CotizacionUpdate, ConvertirVentaRequest
 from app.crud.venta import _validar_stock_para_venta, _update_stock
 
@@ -55,12 +57,19 @@ def _validate_foreign_keys(db: Session, cliente_id: int, detalles: list):
         producto = db.query(Producto).filter(Producto.id == detalle.producto_id).first()
         if not producto:
             raise HTTPException(status_code=400, detail=f"Producto {detalle.producto_id} no existe")
-        if not detalle.cantidad or int(detalle.cantidad) < 1:
+        if not detalle.cantidad or Decimal(detalle.cantidad) < Decimal("0.01"):
             raise HTTPException(status_code=400, detail=f"Cantidad inválida para el producto {detalle.producto_id}")
         if Decimal(detalle.costo or 0) < 0:
             raise HTTPException(status_code=400, detail=f"Costo inválido para el producto {detalle.producto_id}")
         if Decimal(detalle.utilidad_pct or 0) < 0:
             raise HTTPException(status_code=400, detail=f"Utilidad inválida para el producto {detalle.producto_id}")
+        if getattr(detalle, "unidad_id", None):
+            pu = db.query(ProductoUnidad).filter(
+                ProductoUnidad.producto_id == detalle.producto_id,
+                ProductoUnidad.unidad_id == detalle.unidad_id,
+            ).first()
+            if not pu:
+                raise HTTPException(status_code=400, detail=f"Unidad {detalle.unidad_id} no registrada en el producto {detalle.producto_id}")
 
 
 def _get_estado_por_nombre(db: Session, nombre: str):
@@ -70,6 +79,43 @@ def _get_estado_por_nombre(db: Session, nombre: str):
         db.add(estado)
         db.flush()
     return estado
+
+
+def _get_unidad_info(db: Session, producto_id: int, unidad_id: int = None):
+    if unidad_id:
+        pu = db.query(ProductoUnidad).filter(
+            ProductoUnidad.producto_id == producto_id,
+            ProductoUnidad.unidad_id == unidad_id,
+        ).first()
+        if pu:
+            u = db.query(UnidadMedida).filter(UnidadMedida.id == unidad_id).first()
+            return {
+                "pu": pu,
+                "unidad_nombre": u.nombre if u else "",
+                "unidad_abreviatura": u.abreviatura if u else "",
+                "factor": pu.factor_conversion or Decimal("1"),
+                "es_principal": bool(pu.es_principal),
+            }
+    pu = db.query(ProductoUnidad).filter(
+        ProductoUnidad.producto_id == producto_id,
+        ProductoUnidad.es_principal == True,
+    ).first()
+    if pu:
+        u = db.query(UnidadMedida).filter(UnidadMedida.id == pu.unidad_id).first()
+        return {
+            "pu": pu,
+            "unidad_nombre": u.nombre if u else "",
+            "unidad_abreviatura": u.abreviatura if u else "",
+            "factor": Decimal("1"),
+            "es_principal": True,
+        }
+    return {
+        "pu": None,
+        "unidad_nombre": "",
+        "unidad_abreviatura": "",
+        "factor": Decimal("1"),
+        "es_principal": True,
+    }
 
 
 def _build_response(db: Session, cot: Cotizacion):
@@ -84,6 +130,10 @@ def _build_response(db: Session, cot: Cotizacion):
         if prod and prod.categoria:
             cat_nombre = prod.categoria.nombre
         stock_actual = prod.stock_actual if prod else 0
+        uinfo = _get_unidad_info(db, d.producto_id, d.unidad_id)
+        factor = uinfo["factor"]
+        cantidad_principal = _q(Decimal(d.cantidad) / factor) if factor > 0 else Decimal(d.cantidad)
+
         detalles_response.append({
             "id": d.id,
             "producto_id": d.producto_id,
@@ -91,12 +141,17 @@ def _build_response(db: Session, cot: Cotizacion):
             "producto_codigo": prod.codigo if prod else "",
             "producto_categoria": cat_nombre,
             "producto_imagen": prod.imagen if prod else None,
+            "unidad_id": d.unidad_id,
+            "unidad_nombre": uinfo["unidad_nombre"],
+            "unidad_abreviatura": uinfo["unidad_abreviatura"],
+            "es_principal": uinfo["es_principal"],
+            "factor_conversion": factor,
             "cantidad": d.cantidad,
             "costo": d.costo,
             "utilidad_pct": d.utilidad_pct,
             "precio_venta": d.precio_venta,
             "stock_actual": stock_actual,
-            "dias_disponibilidad": d.dias_disponibilidad,
+            "cantidad_principal": cantidad_principal,
         })
 
     usuario = db.query(Usuario).filter(Usuario.id == cot.usuario_id).first()
@@ -163,6 +218,15 @@ def _fecha_hora(fecha: datetime) -> datetime:
     return datetime.combine(fecha.date(), datetime.now().time())
 
 
+def _resolve_costo_por_unidad(db: Session, producto_id: int, unidad_id: int, costo_enviado: Decimal) -> Decimal:
+    uinfo = _get_unidad_info(db, producto_id, unidad_id)
+    factor = uinfo["factor"]
+    if uinfo["es_principal"]:
+        return _q(costo_enviado)
+    costo_unitario = _q(Decimal(costo_enviado) / factor) if factor > 0 else _q(costo_enviado)
+    return costo_unitario
+
+
 def create_cotizacion(db: Session, cot: CotizacionCreate, usuario_id: int):
     _validate_foreign_keys(db, cot.cliente_id, cot.detalles)
     if not cot.detalles:
@@ -199,14 +263,15 @@ def create_cotizacion(db: Session, cot: CotizacionCreate, usuario_id: int):
     db_cot.numero = f"COT-{db_cot.id:06d}"
 
     for detalle in cot.detalles:
+        costo_por_unidad = _resolve_costo_por_unidad(db, detalle.producto_id, detalle.unidad_id, detalle.costo)
         db_detalle = CotizacionDetalle(
             cotizacion_id=db_cot.id,
             producto_id=detalle.producto_id,
-            cantidad=int(detalle.cantidad),
-            costo=_q(detalle.costo),
+            unidad_id=detalle.unidad_id,
+            cantidad=Decimal(detalle.cantidad),
+            costo=costo_por_unidad,
             utilidad_pct=_q(detalle.utilidad_pct),
-            precio_venta=_precio_venta(detalle.costo, detalle.utilidad_pct),
-            dias_disponibilidad=detalle.dias_disponibilidad,
+            precio_venta=_precio_venta(costo_por_unidad, detalle.utilidad_pct),
         )
         db.add(db_detalle)
 
@@ -262,14 +327,15 @@ def update_cotizacion(db: Session, cotizacion_id: int, cot: CotizacionUpdate):
         _validate_foreign_keys(db, cliente_id, cot.detalles)
         db.query(CotizacionDetalle).filter(CotizacionDetalle.cotizacion_id == cotizacion_id).delete()
         for detalle in cot.detalles:
+            costo_por_unidad = _resolve_costo_por_unidad(db, detalle.producto_id, detalle.unidad_id, detalle.costo)
             db_detalle = CotizacionDetalle(
                 cotizacion_id=cotizacion_id,
                 producto_id=detalle.producto_id,
-                cantidad=int(detalle.cantidad),
-                costo=_q(detalle.costo),
+                unidad_id=detalle.unidad_id,
+                cantidad=Decimal(detalle.cantidad),
+                costo=costo_por_unidad,
                 utilidad_pct=_q(detalle.utilidad_pct),
-                precio_venta=_precio_venta(detalle.costo, detalle.utilidad_pct),
-                dias_disponibilidad=detalle.dias_disponibilidad,
+                precio_venta=_precio_venta(costo_por_unidad, detalle.utilidad_pct),
             )
             db.add(db_detalle)
 
@@ -373,16 +439,20 @@ def convertir_en_venta(db: Session, cotizacion_id: int, payload: ConvertirVentaR
         db.flush()
 
         for d in detalles:
+            uinfo = _get_unidad_info(db, d.producto_id, d.unidad_id)
+            factor = uinfo["factor"]
+            cantidad_principal = _q(Decimal(d.cantidad) / factor) if factor > 0 else Decimal(d.cantidad)
+            precio_venta_principal = _q(Decimal(d.precio_venta) * factor) if factor > 0 else Decimal(d.precio_venta)
             utilidad = _q(Decimal(d.costo) * Decimal(d.utilidad_pct) / 100)
             db_detalle = VentaDetalle(
                 venta_id=db_venta.id,
                 producto_id=d.producto_id,
-                cantidad=d.cantidad,
-                precio=d.precio_venta,
+                cantidad=int(cantidad_principal),
+                precio=precio_venta_principal,
                 utilidad=utilidad,
             )
             db.add(db_detalle)
-            _update_stock(db, d.producto_id, d.cantidad, sumar=False)
+            _update_stock(db, d.producto_id, int(cantidad_principal), sumar=False)
 
         db_cot.venta_id = db_venta.id
         db.commit()

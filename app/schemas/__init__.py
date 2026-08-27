@@ -10,3 +10,6 @@ from app.schemas.estado import EstadoCreate, EstadoResponse
 from app.schemas.compra import CompraCreate, CompraResponse, CompraDetalleCreate
 from app.schemas.venta import VentaCreate, VentaResponse, VentaDetalleCreate
 from app.schemas.token import Token, TokenData
+from app.schemas.categoria_unidad import CategoriaUnidadCreate, CategoriaUnidadResponse
+from app.schemas.unidad_medida import UnidadMedidaCreate, UnidadMedidaResponse
+from app.schemas.producto_unidad import ProductoUnidadCreate, ProductoUnidadResponse

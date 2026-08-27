@@ -10,7 +10,7 @@ from jose import jwt
 from PIL import Image
 from app.database import get_db
 from app.schemas.producto import ProductoCreate, ProductoUpdate, ProductoResponse
-from app.crud.producto import get_productos, get_producto, get_producto_by_codigo, create_producto, update_producto, delete_producto, delete_productos_batch as crud_delete_batch, delete_all_productos as crud_delete_all
+from app.crud.producto import get_productos_full, get_producto_full, get_producto_by_codigo, create_producto, update_producto, delete_producto, delete_productos_batch as crud_delete_batch, delete_all_productos as crud_delete_all
 from app.models.producto import Producto
 from app.models.categoria import Categoria
 from app.models.usuario import Usuario
@@ -25,7 +25,7 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 @router.get("/", response_model=List[ProductoResponse])
 def read_productos(skip: int = 0, limit: int = 10000, db: Session = Depends(get_db)):
-    return get_productos(db, skip, limit)
+    return get_productos_full(db, skip, limit)
 
 @router.get("/export-xlsx")
 def export_productos(db: Session = Depends(get_db)):
@@ -175,14 +175,15 @@ def read_producto_by_codigo(codigo: str, db: Session = Depends(get_db)):
     db_producto = get_producto_by_codigo(db, codigo)
     if not db_producto:
         raise HTTPException(status_code=404, detail="Producto not found")
-    return db_producto
+    from app.crud.producto import _build_full_response
+    return _build_full_response(db, db_producto)
 
 @router.get("/{producto_id}", response_model=ProductoResponse)
 def read_producto(producto_id: int, db: Session = Depends(get_db)):
-    db_producto = get_producto(db, producto_id)
-    if not db_producto:
+    result = get_producto_full(db, producto_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Producto not found")
-    return db_producto
+    return result
 
 @router.post("/", response_model=ProductoResponse)
 def create_producto_endpoint(producto: ProductoCreate, db: Session = Depends(get_db)):
@@ -211,14 +212,16 @@ def delete_producto_endpoint(producto_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/{producto_id}/toggle-activo", response_model=ProductoResponse)
 def toggle_producto_activo(producto_id: int, db: Session = Depends(get_db)):
-    db_producto = get_producto(db, producto_id)
+    from app.crud.producto import get_producto as _get_producto
+    db_producto = _get_producto(db, producto_id)
     if not db_producto:
         raise HTTPException(status_code=404, detail="Producto not found")
     db_producto.activo = not db_producto.activo
     db.commit()
     db.refresh(db_producto)
+    from app.crud.producto import _build_full_response
     broadcast_multiple_sync(["productos", "dashboard"], {"type": "updated", "room": "productos"})
-    return db_producto
+    return _build_full_response(db, db_producto)
 
 @router.post("/{producto_id}/imagen")
 async def upload_producto_imagen(producto_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -250,7 +253,8 @@ async def upload_producto_imagen(producto_id: int, file: UploadFile = File(...),
 
 @router.delete("/{producto_id}/imagen")
 def delete_producto_imagen(producto_id: int, db: Session = Depends(get_db)):
-    db_producto = get_producto(db, producto_id)
+    from app.crud.producto import get_producto as _get_producto
+    db_producto = _get_producto(db, producto_id)
     if not db_producto:
         raise HTTPException(status_code=404, detail="Producto not found")
     if db_producto.imagen:

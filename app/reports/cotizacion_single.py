@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session, selectinload
 import io
+from decimal import Decimal
 from pathlib import Path
 from xml.sax.saxutils import escape
 from reportlab.lib.pagesizes import letter
@@ -35,6 +36,8 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
     from app.models.cotizacion_detalle import CotizacionDetalle
     from app.models.producto import Producto
     from app.models.usuario import Usuario
+    from app.models.producto_unidad import ProductoUnidad
+    from app.models.unidad_medida import UnidadMedida
 
     cot = db.query(Cotizacion).filter(Cotizacion.id == cotizacion_id).first()
     if not cot:
@@ -102,11 +105,11 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         Paragraph('#', styles['HeaderCell']),
         Paragraph('Código', styles['HeaderCell']),
         Paragraph('Producto', styles['HeaderCell']),
+        Paragraph('Unidad', styles['HeaderCell']),
         Paragraph('Cant.', styles['HeaderCell']),
         Paragraph('Costo (Bs.)', styles['HeaderCell']),
         Paragraph('P. Venta (Bs.)', styles['HeaderCell']),
         Paragraph('Subtotal (Bs.)', styles['HeaderCell']),
-        Paragraph('Disponible en', styles['HeaderCell']),
     ]
 
     data = [headers]
@@ -137,19 +140,51 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         if prod and prod.categoria:
             cat_nombre = prod.categoria.nombre
         prod_nombre = f"{cat_nombre} - {prod.descripcion} - {prod.marca}" + (f" - {prod.procedencia}" if prod.procedencia else "") if cat_nombre and prod else (prod.descripcion if prod else '-')
-        subtotal = d.cantidad * d.precio_venta
-        dias_disp = d.dias_disponibilidad
-        dias_texto = f"{dias_disp} día(s)" if dias_disp is not None else "-"
+        subtotal = Decimal(d.cantidad) * Decimal(d.precio_venta)
+
+        # Unidad info
+        unidad_texto = "-"
+        cantidad_texto = str(d.cantidad)
+        if d.unidad_id:
+            u = db.query(UnidadMedida).filter(UnidadMedida.id == d.unidad_id).first()
+            if u:
+                pu = db.query(ProductoUnidad).filter(
+                    ProductoUnidad.producto_id == d.producto_id,
+                    ProductoUnidad.unidad_id == d.unidad_id,
+                ).first()
+                factor = pu.factor_conversion if pu else Decimal("1")
+                es_principal = pu.es_principal if pu else False
+                if not es_principal and factor and factor > 0:
+                    cant_principal = Decimal(d.cantidad) / factor
+                    abrev = u.abreviatura or u.nombre
+                    # Buscar unidad principal
+                    pu_principal = db.query(ProductoUnidad).filter(
+                        ProductoUnidad.producto_id == d.producto_id,
+                        ProductoUnidad.es_principal == True,
+                    ).first()
+                    abrev_principal = ""
+                    if pu_principal:
+                        u_principal = db.query(UnidadMedida).filter(UnidadMedida.id == pu_principal.unidad_id).first()
+                        abrev_principal = u_principal.abreviatura if u_principal else ""
+                    if abrev_principal:
+                        unidad_texto = f"{u.nombre} ({u.abreviatura or u.nombre})"
+                        cantidad_texto = f"{d.cantidad} {abrev} ({cant_principal:.2f} {abrev_principal})"
+                    else:
+                        unidad_texto = f"{u.nombre} ({u.abreviatura or u.nombre})"
+                        cantidad_texto = f"{d.cantidad}"
+                else:
+                    unidad_texto = f"{u.nombre} ({u.abreviatura or u.nombre})"
+                    cantidad_texto = str(d.cantidad)
 
         row = [
             Paragraph(str(i), styles['CellCenter']),
             Paragraph(escape(prod.codigo) if prod else '-', styles['CellCenter']),
             build_producto_cell(prod, prod_nombre),
-            Paragraph(str(d.cantidad), styles['CellCenter']),
+            Paragraph(escape(unidad_texto), styles['CellCenter']),
+            Paragraph(escape(cantidad_texto), styles['CellCenter']),
             Paragraph(f"{d.costo:.2f}", styles['CellRight']),
             Paragraph(f"{d.precio_venta:.2f}", styles['CellRight']),
             Paragraph(f"{subtotal:.2f}", styles['CellRight']),
-            Paragraph(dias_texto, styles['CellCenter']),
         ]
         data.append(row)
 
@@ -158,7 +193,7 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         Paragraph('', styles['CellWrap']),
         Paragraph('', styles['CellWrap']),
         Paragraph('', styles['CellCenter']),
-        Paragraph('', styles['CellRight']),
+        Paragraph('', styles['CellCenter']),
         Paragraph('', styles['CellRight']),
         Paragraph('SUBTOTAL:', styles['CellRight']),
         Paragraph(f"Bs. {cot.subtotal:.2f}", styles['CellRight']),
@@ -170,7 +205,7 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellCenter']),
-            Paragraph('', styles['CellRight']),
+            Paragraph('', styles['CellCenter']),
             Paragraph('', styles['CellRight']),
             Paragraph('IVA (13%):', styles['CellRight']),
             Paragraph(f"Bs. {cot.iva:.2f}", styles['CellRight']),
@@ -180,7 +215,7 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellCenter']),
-            Paragraph('', styles['CellRight']),
+            Paragraph('', styles['CellCenter']),
             Paragraph('', styles['CellRight']),
             Paragraph('IT (3%):', styles['CellRight']),
             Paragraph(f"Bs. {cot.it:.2f}", styles['CellRight']),
@@ -193,7 +228,7 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellCenter']),
-            Paragraph('', styles['CellRight']),
+            Paragraph('', styles['CellCenter']),
             Paragraph('', styles['CellRight']),
             Paragraph(f"DESCUENTO ({cot.descuento}%):", styles['CellRight']),
             Paragraph(f"- Bs. {descuento_monto:.2f}", styles['CellRight']),
@@ -204,7 +239,7 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         Paragraph('', styles['CellWrap']),
         Paragraph('', styles['CellWrap']),
         Paragraph('', styles['CellCenter']),
-        Paragraph('', styles['CellRight']),
+        Paragraph('', styles['CellCenter']),
         Paragraph('', styles['CellRight']),
         Paragraph('TOTAL:', styles['CellRight']),
         Paragraph(f"Bs. {cot.total:.2f}", styles['CellRight']),
@@ -212,14 +247,14 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
 
     primary, secondary = empresa_colors(db)
 
-    col_widths = [0.35 * inch, 0.55 * inch, 1.8 * inch, 0.4 * inch, 0.6 * inch, 0.7 * inch, 0.8 * inch, 0.9 * inch]
+    col_widths = [0.3 * inch, 0.5 * inch, 1.5 * inch, 0.7 * inch, 0.4 * inch, 0.55 * inch, 0.65 * inch, 0.75 * inch]
 
     table = Table(data, colWidths=col_widths)
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), secondary),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+        ('ALIGN', (1, 1), (2, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),

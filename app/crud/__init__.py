@@ -9,3 +9,6 @@ from app.crud.comprobante import *
 from app.crud.estado import *
 from app.crud.compra import *
 from app.crud.venta import *
+from app.crud.categoria_unidad import *
+from app.crud.unidad_medida import *
+from app.crud.producto_unidad import *

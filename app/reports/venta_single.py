@@ -14,6 +14,8 @@ def generar_comprobante_venta(db: Session, venta_id: int):
     from app.models.comprobante import Comprobante
     from app.models.estado import Estado
     from app.models.producto import Producto
+    from app.models.producto_unidad import ProductoUnidad
+    from app.models.unidad_medida import UnidadMedida
 
     venta = db.query(Venta).filter(Venta.id == venta_id).first()
     if not venta:
@@ -98,11 +100,22 @@ def generar_comprobante_venta(db: Session, venta_id: int):
         prod_nombre = f"{cat_nombre} - {prod.descripcion} - {prod.marca}" + (f" - {prod.procedencia}" if prod.procedencia else "") if cat_nombre and prod else (prod.descripcion if prod else '-')
         subtotal = d.cantidad * d.precio
         subtotal_total += subtotal
+        # Unidad del producto
+        unidad_texto = ""
+        if prod:
+            pu = db.query(ProductoUnidad).filter(
+                ProductoUnidad.producto_id == prod.id,
+                ProductoUnidad.es_principal == True,
+            ).first()
+            if pu:
+                u = db.query(UnidadMedida).filter(UnidadMedida.id == pu.unidad_id).first()
+                if u:
+                    unidad_texto = f" {u.abreviatura or u.nombre}"
         data.append([
             Paragraph(str(i), styles['CellCenter']),
             Paragraph(prod.codigo if prod else '-', styles['CellCenter']),
             Paragraph(prod_nombre, styles['CellWrap']),
-            Paragraph(str(d.cantidad), styles['CellCenter']),
+            Paragraph(f"{d.cantidad}{unidad_texto}", styles['CellCenter']),
             Paragraph(f"{d.precio:.2f}", styles['CellRight']),
             Paragraph(f"{subtotal:.2f}", styles['CellRight']),
         ])

@@ -39,10 +39,23 @@ def generar_kardex(db: Session, producto_id: int, fecha_inicio: datetime, fecha_
     from app.models.venta_detalle import VentaDetalle
     from app.models.comprobante import Comprobante
     from app.models.estado import Estado
+    from app.models.producto_unidad import ProductoUnidad
+    from app.models.unidad_medida import UnidadMedida
 
     producto = db.query(Producto).filter(Producto.id == producto_id).first()
     if not producto:
         return None
+
+    # Unidad principal del producto
+    unidad_abrev = ""
+    pu = db.query(ProductoUnidad).filter(
+        ProductoUnidad.producto_id == producto_id,
+        ProductoUnidad.es_principal == True,
+    ).first()
+    if pu:
+        u = db.query(UnidadMedida).filter(UnidadMedida.id == pu.unidad_id).first()
+        if u:
+            unidad_abrev = u.abreviatura or u.nombre
 
     entradas_q = db.query(
         Compra.fecha,
@@ -218,10 +231,10 @@ def generar_kardex(db: Session, producto_id: int, fecha_inicio: datetime, fecha_
             m['fecha'].strftime('%d/%m/%Y %H:%M'),
             celda_tipo(m['tipo']),
             m['detalle'],
-            str(m['cantidad']),
+            f"{m['cantidad']} {unidad_abrev}",
             bs(m['precio']),
             bs(m['total']),
-            str(saldo),
+            f"{saldo} {unidad_abrev}",
         ])
 
     table = Table(data, repeatRows=1, colWidths=[1.0*inch, 1.1*inch, 2.1*inch, 0.8*inch, 0.9*inch, 0.9*inch, 0.7*inch])

@@ -20,3 +20,6 @@ from app.models.cotizacion_detalle import CotizacionDetalle
 from app.models.nota_entrega import NotaEntrega, NotaEntregaDetalle
 from app.models.categoria_gasto import CategoriaGasto
 from app.models.gasto import Gasto
+from app.models.categoria_unidad import CategoriaUnidad
+from app.models.unidad_medida import UnidadMedida
+from app.models.producto_unidad import ProductoUnidad
