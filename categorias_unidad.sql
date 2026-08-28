@@ -1,5 +1,4 @@
--- Datos existentes de la tabla categorias_unidad (sistema_yct)
--- Inserta solo registros que no existan (idempotente, respeta el id).
+-- Datos de la tabla categorias_unidad (sistema_yct)
 INSERT INTO categorias_unidad (id, nombre, descripcion, activo, fecha_registro, fecha_actualizado)
 SELECT v.*
 FROM (
@@ -16,5 +15,4 @@ FROM (
     ROW(10,'GAS NATURAL','Unidades de gas y volumen industrial',1,'2026-08-27 15:57:50','2026-08-27 15:57:50'),
     ROW(11,'TIEMPO','Unidades de tiempo',1,'2026-08-27 15:57:50','2026-08-27 15:57:50'),
     ROW(12,'OTROS','Otras unidades',1,'2026-08-27 15:57:50','2026-08-27 15:57:50')
-) AS v(id, nombre, descripcion, activo, fecha_registro, fecha_actualizado)
-WHERE NOT EXISTS (SELECT 1 FROM categorias_unidad c WHERE c.id = v.id);
+) AS v(id, nombre, descripcion, activo, fecha_registro, fecha_actualizado);
