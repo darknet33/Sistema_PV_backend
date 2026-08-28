@@ -107,7 +107,6 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         Paragraph('Producto', styles['HeaderCell']),
         Paragraph('Unidad', styles['HeaderCell']),
         Paragraph('Cant.', styles['HeaderCell']),
-        Paragraph('Costo (Bs.)', styles['HeaderCell']),
         Paragraph('P. Venta (Bs.)', styles['HeaderCell']),
         Paragraph('Subtotal (Bs.)', styles['HeaderCell']),
     ]
@@ -117,12 +116,12 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
     def build_producto_cell(prod, prod_nombre):
         if not (incluir_imagenes and prod):
             return Paragraph(escape(prod_nombre), styles['CellWrap'])
-        img = _imagen_escalada(prod.imagen, 0.7 * inch, 0.6 * inch)
+        img = _imagen_escalada(prod.imagen, 0.8 * inch, 0.7 * inch)
         if not img:
             return Paragraph(escape(prod_nombre), styles['CellWrap'])
         inner = Table(
             [[img, Paragraph(escape(prod_nombre), styles['CellWrap'])]],
-            colWidths=[0.75 * inch, 1.1 * inch],
+            colWidths=[0.85 * inch, 1.85 * inch],
         )
         inner.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -182,7 +181,6 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
             build_producto_cell(prod, prod_nombre),
             Paragraph(escape(unidad_texto), styles['CellCenter']),
             Paragraph(escape(cantidad_texto), styles['CellCenter']),
-            Paragraph(f"{d.costo:.2f}", styles['CellRight']),
             Paragraph(f"{d.precio_venta:.2f}", styles['CellRight']),
             Paragraph(f"{subtotal:.2f}", styles['CellRight']),
         ]
@@ -194,7 +192,6 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         Paragraph('', styles['CellWrap']),
         Paragraph('', styles['CellCenter']),
         Paragraph('', styles['CellCenter']),
-        Paragraph('', styles['CellRight']),
         Paragraph('SUBTOTAL:', styles['CellRight']),
         Paragraph(f"Bs. {cot.subtotal:.2f}", styles['CellRight']),
     ])
@@ -206,7 +203,6 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellCenter']),
             Paragraph('', styles['CellCenter']),
-            Paragraph('', styles['CellRight']),
             Paragraph('IVA (13%):', styles['CellRight']),
             Paragraph(f"Bs. {cot.iva:.2f}", styles['CellRight']),
         ])
@@ -216,7 +212,6 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellCenter']),
             Paragraph('', styles['CellCenter']),
-            Paragraph('', styles['CellRight']),
             Paragraph('IT (3%):', styles['CellRight']),
             Paragraph(f"Bs. {cot.it:.2f}", styles['CellRight']),
         ])
@@ -229,7 +224,6 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
             Paragraph('', styles['CellWrap']),
             Paragraph('', styles['CellCenter']),
             Paragraph('', styles['CellCenter']),
-            Paragraph('', styles['CellRight']),
             Paragraph(f"DESCUENTO ({cot.descuento}%):", styles['CellRight']),
             Paragraph(f"- Bs. {descuento_monto:.2f}", styles['CellRight']),
         ])
@@ -240,14 +234,13 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         Paragraph('', styles['CellWrap']),
         Paragraph('', styles['CellCenter']),
         Paragraph('', styles['CellCenter']),
-        Paragraph('', styles['CellRight']),
         Paragraph('TOTAL:', styles['CellRight']),
         Paragraph(f"Bs. {cot.total:.2f}", styles['CellRight']),
     ])
 
     primary, secondary = empresa_colors(db)
 
-    col_widths = [0.3 * inch, 0.5 * inch, 1.5 * inch, 0.7 * inch, 0.4 * inch, 0.55 * inch, 0.65 * inch, 0.75 * inch]
+    col_widths = [0.35 * inch, 0.7 * inch, 2.95 * inch, 0.85 * inch, 0.5 * inch, 0.95 * inch, 1.0 * inch]
 
     table = Table(data, colWidths=col_widths)
     table.setStyle(TableStyle([
@@ -259,9 +252,9 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('GRID', (0, 0), (-1, -2), 0.5, colors.grey),
-        ('LINEBELOW', (6, -1), (-1, -1), 1, colors.black),
-        ('FONTNAME', (6, -1), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (6, -1), (-1, -1), 10),
+        ('LINEBELOW', (5, -1), (-1, -1), 1, colors.black),
+        ('FONTNAME', (5, -1), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (5, -1), (-1, -1), 10),
         ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f0f0f0')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#f9f9f9')]),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
