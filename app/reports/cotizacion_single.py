@@ -105,7 +105,7 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         Paragraph('#', styles['HeaderCell']),
         Paragraph('Código', styles['HeaderCell']),
         Paragraph('Producto', styles['HeaderCell']),
-        Paragraph('Unidad', styles['HeaderCell']),
+        Paragraph('Unidad de medida', styles['HeaderCell']),
         Paragraph('Cant.', styles['HeaderCell']),
         Paragraph('P. Venta (Bs.)', styles['HeaderCell']),
         Paragraph('Subtotal (Bs.)', styles['HeaderCell']),
@@ -116,12 +116,12 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
     def build_producto_cell(prod, prod_nombre):
         if not (incluir_imagenes and prod):
             return Paragraph(escape(prod_nombre), styles['CellWrap'])
-        img = _imagen_escalada(prod.imagen, 0.8 * inch, 0.7 * inch)
+        img = _imagen_escalada(prod.imagen, 0.7 * inch, 0.6 * inch)
         if not img:
             return Paragraph(escape(prod_nombre), styles['CellWrap'])
         inner = Table(
             [[img, Paragraph(escape(prod_nombre), styles['CellWrap'])]],
-            colWidths=[0.85 * inch, 1.85 * inch],
+            colWidths=[0.7 * inch, 1.7 * inch],
         )
         inner.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -240,7 +240,7 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
 
     primary, secondary = empresa_colors(db)
 
-    col_widths = [0.35 * inch, 0.7 * inch, 2.95 * inch, 0.85 * inch, 0.5 * inch, 0.95 * inch, 1.0 * inch]
+    col_widths = [0.35 * inch, 0.7 * inch, 2.55 * inch, 1.25 * inch, 0.5 * inch, 0.95 * inch, 1.0 * inch]
 
     table = Table(data, colWidths=col_widths)
     table.setStyle(TableStyle([
