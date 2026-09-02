@@ -10,11 +10,11 @@ from jose import jwt
 from PIL import Image
 from app.database import get_db
 from app.schemas.producto import ProductoCreate, ProductoUpdate, ProductoResponse
-from app.crud.producto import get_productos_full, get_producto_full, get_producto_by_codigo, create_producto, update_producto, delete_producto, delete_productos_batch as crud_delete_batch, delete_all_productos as crud_delete_all
+from app.crud.producto import get_productos_full, get_producto, get_producto_full, get_producto_by_codigo, create_producto, update_producto, delete_producto, delete_productos_batch as crud_delete_batch, delete_all_productos as crud_delete_all
 from app.models.producto import Producto
 from app.models.categoria import Categoria
 from app.models.usuario import Usuario
-from app.auth import SECRET_KEY, ALGORITHM, oauth2_scheme
+from app.auth import SECRET_KEY, ALGORITHM, oauth2_scheme, get_current_user_full
 from app.ws import broadcast_sync, broadcast_multiple_sync
 
 router = APIRouter()
@@ -186,11 +186,11 @@ def read_producto(producto_id: int, db: Session = Depends(get_db)):
     return result
 
 @router.post("/", response_model=ProductoResponse)
-def create_producto_endpoint(producto: ProductoCreate, db: Session = Depends(get_db)):
+def create_producto_endpoint(producto: ProductoCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user_full)):
     db_producto = get_producto_by_codigo(db, producto.codigo)
     if db_producto:
         raise HTTPException(status_code=400, detail="Codigo already registered")
-    result = create_producto(db, producto)
+    result = create_producto(db, producto, usuario_id=current_user.id)
     broadcast_multiple_sync(["productos", "dashboard"], {"type": "created", "room": "productos"})
     return result
 

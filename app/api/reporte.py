@@ -94,6 +94,8 @@ def dashboard(db: Session = Depends(get_db)):
     from app.models.venta import Venta
     from app.models.venta_detalle import VentaDetalle
     from app.models.compra import Compra
+    from app.models.gasto import Gasto
+    from app.models.estado import Estado
     from app.models.producto import Producto
     from app.models.usuario import Usuario
     from sqlalchemy import func
@@ -122,6 +124,25 @@ def dashboard(db: Session = Depends(get_db)):
         func.coalesce(func.sum(Compra.total), 0).label('total'),
     ).filter(Compra.fecha.between(inicio_30d, fin_hoy)).group_by(func.date(Compra.fecha)).order_by(func.date(Compra.fecha)).all()
 
+    # Utilidad por dia (últimos 30 días) — suma de utilidad * cantidad en detalles de ventas no anuladas
+    utilidad_por_dia = db.query(
+        func.date(Venta.fecha).label('fecha'),
+        func.coalesce(func.sum(VentaDetalle.utilidad * VentaDetalle.cantidad), 0).label('total'),
+    ).join(Venta, VentaDetalle.venta_id == Venta.id).join(Estado, Venta.estado_id == Estado.id).filter(
+        Venta.fecha.between(inicio_30d, fin_hoy),
+        func.upper(Estado.nombre) != 'ANULADO',
+    ).group_by(func.date(Venta.fecha)).order_by(func.date(Venta.fecha)).all()
+
+    # Gastos por dia (últimos 30 días) — solo gastos activos no anulados
+    gastos_por_dia = db.query(
+        func.date(Gasto.fecha).label('fecha'),
+        func.coalesce(func.sum(Gasto.monto), 0).label('total'),
+    ).join(Estado, Gasto.estado_id == Estado.id).filter(
+        Gasto.fecha.between(inicio_30d, fin_hoy),
+        Gasto.activo == True,
+        func.upper(Estado.nombre) != 'ANULADO',
+    ).group_by(func.date(Gasto.fecha)).order_by(func.date(Gasto.fecha)).all()
+
     # Top vendedores
     top_vendedores = db.query(
         Usuario.username,
@@ -141,6 +162,8 @@ def dashboard(db: Session = Depends(get_db)):
         },
         'ventas_por_dia': [{'fecha': str(r.fecha), 'cantidad': r.cantidad, 'total': float(r.total)} for r in ventas_por_dia],
         'compras_por_dia': [{'fecha': str(r.fecha), 'cantidad': r.cantidad, 'total': float(r.total)} for r in compras_por_dia],
+        'utilidad_por_dia': [{'fecha': str(r.fecha), 'total': float(r.total)} for r in utilidad_por_dia],
+        'gastos_por_dia': [{'fecha': str(r.fecha), 'total': float(r.total)} for r in gastos_por_dia],
         'top_vendedores': [{'username': r.username, 'cantidad': r.cantidad, 'total': float(r.total)} for r in top_vendedores],
         'stock_bajo': [{
             'id': p.id,

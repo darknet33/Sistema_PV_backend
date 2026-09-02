@@ -29,6 +29,7 @@ class VentaBase(BaseModel):
     num_comprobante: Optional[str] = None
     estado_id: int
     impuesto: Decimal = 0
+    it: Optional[Decimal] = None
     descuento: Decimal = 0
     detalles: List[VentaDetalleCreate]
 
@@ -42,6 +43,7 @@ class VentaUpdate(BaseModel):
     num_comprobante: Optional[str] = None
     estado_id: Optional[int] = None
     impuesto: Optional[Decimal] = None
+    it: Optional[Decimal] = None
     descuento: Optional[Decimal] = None
     detalles: Optional[List[VentaDetalleCreate]] = None
 

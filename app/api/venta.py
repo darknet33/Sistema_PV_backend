@@ -36,12 +36,12 @@ def update_venta_endpoint(venta_id: int, venta: VentaUpdate, db: Session = Depen
     broadcast_multiple_sync(["ventas", "dashboard", "reportes"], {"type": "updated", "room": "ventas"})
     return db_venta
 
-@router.put("/{venta_id}/anular", response_model=VentaResponse)
+@router.put("/{venta_id}/anular")
 def anular_venta_endpoint(venta_id: int, db: Session = Depends(get_db)):
     db_venta = anular_venta(db, venta_id)
     if not db_venta:
         raise HTTPException(status_code=404, detail="Venta not found")
-    broadcast_multiple_sync(["ventas", "dashboard", "reportes"], {"type": "updated", "room": "ventas"})
+    broadcast_multiple_sync(["ventas", "dashboard", "reportes", "cotizaciones"], {"type": "updated", "room": "ventas"})
     return db_venta
 
 @router.delete("/{venta_id}")

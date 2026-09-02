@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session, selectinload
 from fastapi import HTTPException
+from decimal import Decimal
 from datetime import datetime, date
 from app.models.venta import Venta
 from app.models.venta_detalle import VentaDetalle
@@ -8,6 +9,7 @@ from app.models.cliente import Cliente
 from app.models.comprobante import Comprobante
 from app.models.estado import Estado
 from app.models.usuario import Usuario
+from app.models.cotizacion import Cotizacion
 from app.schemas.venta import VentaCreate, VentaUpdate
 
 def _validate_foreign_keys(db: Session, cliente_id: int, comprobante_id: int, estado_id: int, detalles: list):
@@ -124,7 +126,7 @@ def create_venta(db: Session, venta: VentaCreate, usuario_id: int):
 
     subtotal = sum(d.cantidad * d.precio for d in venta.detalles)
     impuesto = Decimal(venta.impuesto or 0)
-    it = Decimal(venta.it or 0)
+    it = Decimal(getattr(venta, 'it', 0) or 0)
     descuento = Decimal(venta.descuento or 0)
     total = subtotal + (subtotal * impuesto / 100) + (subtotal * it / 100) - (subtotal * descuento / 100)
 
@@ -146,7 +148,7 @@ def create_venta(db: Session, venta: VentaCreate, usuario_id: int):
         estado_id=venta.estado_id,
         total=total,
         impuesto=venta.impuesto or 0,
-        it=venta.it or 0,
+        it=getattr(venta, 'it', 0) or 0,
         descuento=venta.descuento or 0,
         usuario_id=usuario_id,
         activo=1 if venta.estado_id == 3 else 0
@@ -195,8 +197,9 @@ def update_venta(db: Session, venta_id: int, venta: VentaUpdate):
         db_venta.activo = 1 if venta.estado_id == 3 else 0
     if venta.impuesto is not None:
         db_venta.impuesto = venta.impuesto
-    if venta.it is not None:
-        db_venta.it = venta.it
+    it_val = getattr(venta, 'it', None)
+    if it_val is not None:
+        db_venta.it = it_val
     if venta.descuento is not None:
         db_venta.descuento = venta.descuento
 
@@ -254,6 +257,15 @@ def anular_venta(db: Session, venta_id: int):
     detalles = db.query(VentaDetalle).filter(VentaDetalle.venta_id == venta_id).all()
     for d in detalles:
         _update_stock(db, d.producto_id, d.cantidad, sumar=True)
+
+    cot = db.query(Cotizacion).filter(Cotizacion.venta_id == venta_id).first()
+    if cot:
+        cot.estado = "Enviado"
+        cot.venta_id = None
+        db.query(VentaDetalle).filter(VentaDetalle.venta_id == venta_id).delete()
+        db.delete(db_venta)
+        db.commit()
+        return {"id": venta_id, "cotizacion_id": cot.id}
 
     db_venta.estado_id = estado_anulado.id
     db_venta.activo = 0
