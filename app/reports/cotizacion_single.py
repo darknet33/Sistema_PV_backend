@@ -36,7 +36,6 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
     from app.models.cotizacion_detalle import CotizacionDetalle
     from app.models.producto import Producto
     from app.models.usuario import Usuario
-    from app.models.producto_unidad import ProductoUnidad
     from app.models.unidad_medida import UnidadMedida
 
     cot = db.query(Cotizacion).filter(Cotizacion.id == cotizacion_id).first()
@@ -141,39 +140,13 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         prod_nombre = f"{cat_nombre} - {prod.descripcion} - {prod.marca}" + (f" - {prod.procedencia}" if prod.procedencia else "") if cat_nombre and prod else (prod.descripcion if prod else '-')
         subtotal = Decimal(d.cantidad) * Decimal(d.precio_venta)
 
-        # Unidad info
+        # Unidad info: la columna Cantidad muestra solo el número; la unidad (nombre + abreviatura) va en su columna
         unidad_texto = "-"
         cantidad_texto = str(d.cantidad)
         if d.unidad_id:
             u = db.query(UnidadMedida).filter(UnidadMedida.id == d.unidad_id).first()
             if u:
-                pu = db.query(ProductoUnidad).filter(
-                    ProductoUnidad.producto_id == d.producto_id,
-                    ProductoUnidad.unidad_id == d.unidad_id,
-                ).first()
-                factor = pu.factor_conversion if pu else Decimal("1")
-                es_principal = pu.es_principal if pu else False
-                if not es_principal and factor and factor > 0:
-                    cant_principal = Decimal(d.cantidad) / factor
-                    abrev = u.abreviatura or u.nombre
-                    # Buscar unidad principal
-                    pu_principal = db.query(ProductoUnidad).filter(
-                        ProductoUnidad.producto_id == d.producto_id,
-                        ProductoUnidad.es_principal == True,
-                    ).first()
-                    abrev_principal = ""
-                    if pu_principal:
-                        u_principal = db.query(UnidadMedida).filter(UnidadMedida.id == pu_principal.unidad_id).first()
-                        abrev_principal = u_principal.abreviatura if u_principal else ""
-                    if abrev_principal:
-                        unidad_texto = f"{u.nombre} ({u.abreviatura or u.nombre})"
-                        cantidad_texto = f"{d.cantidad} {abrev} ({cant_principal:.2f} {abrev_principal})"
-                    else:
-                        unidad_texto = f"{u.nombre} ({u.abreviatura or u.nombre})"
-                        cantidad_texto = f"{d.cantidad}"
-                else:
-                    unidad_texto = f"{u.nombre} ({u.abreviatura or u.nombre})"
-                    cantidad_texto = str(d.cantidad)
+                unidad_texto = f"{u.nombre} ({u.abreviatura or u.nombre})"
 
         row = [
             Paragraph(str(i), styles['CellCenter']),

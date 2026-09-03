@@ -1,5 +1,6 @@
 from typing import List, Optional
 from decimal import Decimal
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.models.producto_unidad import ProductoUnidad
 from app.models.unidad_medida import UnidadMedida
@@ -11,13 +12,41 @@ def get_unidades_producto(db: Session, producto_id: int) -> List[ProductoUnidad]
 
 
 def set_unidades_producto(db: Session, producto_id: int, unidades: List[ProductoUnidadCreate]):
+    if not unidades:
+        raise HTTPException(status_code=400, detail="Debe registrar al menos una unidad para el producto")
+
+    # Regla de negocio: debe existir exactamente una unidad principal
+    principales = [u for u in unidades if u.es_principal]
+    if len(principales) != 1:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Debe existir exactamente una unidad principal (se marcaron {len(principales)})",
+        )
+
+    for u in unidades:
+        factor = u.factor_conversion if u.factor_conversion is not None else Decimal("1")
+        if u.es_principal:
+            if factor != Decimal("1"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="La unidad principal debe tener factor de conversión igual a 1",
+                )
+        else:
+            if factor <= Decimal("1"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Las unidades secundarias deben tener factor de conversión mayor a 1",
+                )
+
     db.query(ProductoUnidad).filter(ProductoUnidad.producto_id == producto_id).delete()
     for u in unidades:
+        factor = u.factor_conversion if u.factor_conversion is not None else Decimal("1")
         db_obj = ProductoUnidad(
             producto_id=producto_id,
             unidad_id=u.unidad_id,
             es_principal=u.es_principal,
-            factor_conversion=u.factor_conversion or Decimal("1"),
+            # La principal siempre queda con factor 1, independiente de lo enviado
+            factor_conversion=Decimal("1") if u.es_principal else factor,
         )
         db.add(db_obj)
     db.flush()

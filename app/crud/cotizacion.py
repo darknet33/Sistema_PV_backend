@@ -132,7 +132,7 @@ def _build_response(db: Session, cot: Cotizacion):
         stock_actual = prod.stock_actual if prod else 0
         uinfo = _get_unidad_info(db, d.producto_id, d.unidad_id)
         factor = uinfo["factor"]
-        cantidad_principal = _q(Decimal(d.cantidad) / factor) if factor > 0 else Decimal(d.cantidad)
+        cantidad_principal = _q(Decimal(d.cantidad) * factor) if factor > 0 else Decimal(d.cantidad)
 
         detalles_response.append({
             "id": d.id,
@@ -219,12 +219,12 @@ def _fecha_hora(fecha: datetime) -> datetime:
 
 
 def _resolve_costo_por_unidad(db: Session, producto_id: int, unidad_id: int, costo_enviado: Decimal) -> Decimal:
+    # El frontend envía costo_base = costo de 1 unidad principal.
+    # El costo de la línea en su unidad = costo_base * factor
+    #   (principal factor 1 -> mismo; secundaria caja factor 10 -> x10)
     uinfo = _get_unidad_info(db, producto_id, unidad_id)
     factor = uinfo["factor"]
-    if uinfo["es_principal"]:
-        return _q(costo_enviado)
-    costo_unitario = _q(Decimal(costo_enviado) / factor) if factor > 0 else _q(costo_enviado)
-    return costo_unitario
+    return _q(Decimal(costo_enviado) * factor) if factor > 0 else _q(costo_enviado)
 
 
 def create_cotizacion(db: Session, cot: CotizacionCreate, usuario_id: int):
@@ -406,7 +406,16 @@ def convertir_en_venta(db: Session, cotizacion_id: int, payload: ConvertirVentaR
         estado_id = estado_pendiente.id
 
     try:
-        _validar_stock_para_venta(db, detalles)
+        # El stock se gestiona en la unidad principal: convertir cada cantidad
+        # de la línea (en su unidad) a cantidad en unidades principales antes de validar.
+        from types import SimpleNamespace
+        detalles_en_principal = []
+        for d in detalles:
+            uinfo = _get_unidad_info(db, d.producto_id, d.unidad_id)
+            factor = uinfo["factor"]
+            cant_principal = Decimal(d.cantidad) * factor if factor > 0 else Decimal(d.cantidad)
+            detalles_en_principal.append(SimpleNamespace(producto_id=d.producto_id, cantidad=cant_principal))
+        _validar_stock_para_venta(db, detalles_en_principal)
 
         if payload.automatico:
             comprobante = db.query(Comprobante).filter(Comprobante.id == payload.comprobante_id).with_for_update().first()
@@ -441,8 +450,11 @@ def convertir_en_venta(db: Session, cotizacion_id: int, payload: ConvertirVentaR
         for d in detalles:
             uinfo = _get_unidad_info(db, d.producto_id, d.unidad_id)
             factor = uinfo["factor"]
-            cantidad_principal = _q(Decimal(d.cantidad) / factor) if factor > 0 else Decimal(d.cantidad)
-            precio_venta_principal = _q(Decimal(d.precio_venta) * factor) if factor > 0 else Decimal(d.precio_venta)
+            # El stock se gestiona SIEMPRE en la unidad principal:
+            #   cantidad_principal = cantidad (en su unidad) * factor  -> nro de unidades principales
+            #   precio por unidad principal = precio_venta (de la línea) / factor
+            cantidad_principal = _q(Decimal(d.cantidad) * factor) if factor > 0 else Decimal(d.cantidad)
+            precio_venta_principal = _q(Decimal(d.precio_venta) / factor) if factor > 0 else Decimal(d.precio_venta)
             utilidad = _q(Decimal(d.costo) * Decimal(d.utilidad_pct) / 100)
             db_detalle = VentaDetalle(
                 venta_id=db_venta.id,
