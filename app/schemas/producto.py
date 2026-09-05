@@ -51,6 +51,7 @@ class ProductoResponse(BaseModel):
     imagen: Optional[str] = None
     usuario_id: Optional[int] = None
     activo: bool
+    en_uso: bool = False
     fecha_registro: datetime
     fecha_actualizado: Optional[datetime] = None
     usuario_nombre: str = ""

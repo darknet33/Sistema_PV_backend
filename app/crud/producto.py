@@ -5,6 +5,7 @@ from app.models.producto import Producto
 from app.models.compra_detalle import CompraDetalle
 from app.models.venta_detalle import VentaDetalle
 from app.models.cotizacion_detalle import CotizacionDetalle
+from app.models.nota_entrega import NotaEntregaDetalle
 from app.schemas.producto import ProductoCreate, ProductoUpdate
 from app.crud.producto_unidad import (
     set_unidades_producto, get_unidades_producto, build_unidad_response, build_unidad_principal
@@ -28,7 +29,8 @@ def get_productos(db: Session, skip: int = 0, limit: int = 10000):
 
 def get_productos_full(db: Session, skip: int = 0, limit: int = 10000):
     prods = get_productos(db, skip, limit)
-    return [_build_full_response(db, p) for p in prods]
+    ids_en_uso = _ids_en_uso(db)
+    return [_build_full_response(db, p, p.id in ids_en_uso) for p in prods]
 
 
 def get_producto_by_codigo(db: Session, codigo: str):
@@ -44,7 +46,9 @@ def _attach_unidad_principal(db: Session, prod: Producto):
     return build_unidad_principal(prod.id, db)
 
 
-def _build_full_response(db: Session, prod: Producto):
+def _build_full_response(db: Session, prod: Producto, en_uso: bool = None):
+    if en_uso is None:
+        en_uso = _tiene_relaciones(db, prod.id)
     unidades = _attach_unidades(db, prod)
     up = _attach_unidad_principal(db, prod)
     return {
@@ -63,6 +67,7 @@ def _build_full_response(db: Session, prod: Producto):
         "imagen": prod.imagen,
         "usuario_id": prod.usuario_id,
         "activo": bool(prod.activo),
+        "en_uso": bool(en_uso),
         "fecha_registro": prod.fecha_registro,
         "fecha_actualizado": prod.fecha_actualizado,
         "usuario_nombre": prod.usuario_nombre if hasattr(prod, "usuario_nombre") else (prod.usuario.username if prod.usuario else ""),
@@ -111,53 +116,55 @@ def update_producto(db: Session, producto_id: int, producto: ProductoUpdate):
     return _build_full_response(db, db_producto)
 
 
+def _ids_en_uso(db: Session) -> set:
+    ids = set()
+    for table in (CompraDetalle, VentaDetalle, CotizacionDetalle, NotaEntregaDetalle):
+        ids.update(row[0] for row in db.query(table.producto_id).distinct().all())
+    return ids
+
+
 def _tiene_relaciones(db: Session, producto_id: int) -> bool:
-    en_compras = db.query(CompraDetalle).filter(CompraDetalle.producto_id == producto_id).first()
-    en_ventas = db.query(VentaDetalle).filter(VentaDetalle.producto_id == producto_id).first()
-    en_cotizaciones = db.query(CotizacionDetalle).filter(CotizacionDetalle.producto_id == producto_id).first()
-    return bool(en_compras or en_ventas or en_cotizaciones)
+    return producto_id in _ids_en_uso(db)
 
 
 def delete_producto(db: Session, producto_id: int):
     db_producto = get_producto(db, producto_id)
     if not db_producto:
         return None
-    if _tiene_relaciones(db, producto_id):
+    en_uso = _tiene_relaciones(db, producto_id)
+    if en_uso:
         db_producto.activo = False
         db.commit()
         db.refresh(db_producto)
-        return _build_full_response(db, db_producto)
-    db.delete(db_producto)
-    db.commit()
-    return db_producto
+    else:
+        db.delete(db_producto)
+        db.commit()
+    return {"id": producto_id, "en_uso": en_uso, "soft_deleted": en_uso}
 
 
 def delete_productos_batch(db: Session, ids: List[int]):
     productos = db.query(Producto).filter(Producto.id.in_(ids)).all()
-    count = 0
+    ids_en_uso = _ids_en_uso(db)
+    soft_deleted = 0
     for p in productos:
-        if _tiene_relaciones(db, p.id):
+        if p.id in ids_en_uso:
             p.activo = False
+            soft_deleted += 1
         else:
             db.delete(p)
-        count += 1
     db.commit()
-    return count
+    return {"count": len(productos), "soft_deleted": soft_deleted, "hard_deleted": len(productos) - soft_deleted}
 
 
 def delete_all_productos(db: Session):
-    ids_con_relaciones = set(
-        row[0] for row in db.query(CompraDetalle.producto_id).distinct().all()
-    ) | set(
-        row[0] for row in db.query(VentaDetalle.producto_id).distinct().all()
-    )
+    ids_en_uso = _ids_en_uso(db)
     productos = db.query(Producto).all()
-    count = 0
+    soft_deleted = 0
     for p in productos:
-        if p.id in ids_con_relaciones:
+        if p.id in ids_en_uso:
             p.activo = False
+            soft_deleted += 1
         else:
             db.delete(p)
-        count += 1
     db.commit()
-    return count
+    return {"count": len(productos), "soft_deleted": soft_deleted, "hard_deleted": len(productos) - soft_deleted}

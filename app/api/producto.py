@@ -160,15 +160,17 @@ async def import_productos(
 def delete_productos_batch_endpoint(ids: List[int], db: Session = Depends(get_db)):
     if not ids:
         raise HTTPException(status_code=400, detail="No se proporcionaron IDs")
-    count = crud_delete_batch(db, ids)
+    result = crud_delete_batch(db, ids)
     broadcast_multiple_sync(["productos", "dashboard"], {"type": "deleted", "room": "productos"})
-    return {"message": f"{count} productos procesados", "count": count}
+    message = f"{result['hard_deleted']} eliminado(s), {result['soft_deleted']} desactivado(s) por estar en uso"
+    return {"message": message, "count": result["count"], "soft_deleted": result["soft_deleted"], "hard_deleted": result["hard_deleted"]}
 
 @router.delete("/all")
 def delete_all_productos_endpoint(db: Session = Depends(get_db)):
-    count = crud_delete_all(db)
+    result = crud_delete_all(db)
     broadcast_multiple_sync(["productos", "dashboard"], {"type": "deleted", "room": "productos"})
-    return {"message": f"Todos los productos procesados ({count})", "count": count}
+    message = f"{result['hard_deleted']} eliminado(s), {result['soft_deleted']} desactivado(s) por estar en uso"
+    return {"message": message, "count": result["count"], "soft_deleted": result["soft_deleted"], "hard_deleted": result["hard_deleted"]}
 
 @router.get("/codigo/{codigo}", response_model=ProductoResponse)
 def read_producto_by_codigo(codigo: str, db: Session = Depends(get_db)):
@@ -204,11 +206,13 @@ def update_producto_endpoint(producto_id: int, producto: ProductoUpdate, db: Ses
 
 @router.delete("/{producto_id}")
 def delete_producto_endpoint(producto_id: int, db: Session = Depends(get_db)):
-    db_producto = delete_producto(db, producto_id)
-    if not db_producto:
+    result = delete_producto(db, producto_id)
+    if not result:
         raise HTTPException(status_code=404, detail="Producto not found")
     broadcast_multiple_sync(["productos", "dashboard"], {"type": "deleted", "room": "productos"})
-    return {"message": "Producto deleted"}
+    if result["soft_deleted"]:
+        return {"message": "Producto en uso, no se eliminó (se desactivó)", "id": producto_id, "soft_deleted": True, "en_uso": True}
+    return {"message": "Producto eliminado", "id": producto_id, "soft_deleted": False, "en_uso": False}
 
 @router.patch("/{producto_id}/toggle-activo", response_model=ProductoResponse)
 def toggle_producto_activo(producto_id: int, db: Session = Depends(get_db)):
