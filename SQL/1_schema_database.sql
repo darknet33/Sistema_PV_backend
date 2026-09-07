@@ -1,7 +1,0 @@
-
-CREATE DATABASE IF NOT EXISTS SistemaRhino CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-USE SistemaRhino;
-
-CREATE USER IF NOT EXISTS 'rhino'@'%' IDENTIFIED BY 'gyrx100PRE#';
-GRANT ALL PRIVILEGES ON SistemaRhino.* TO 'rhino'@'%';
-FLUSH PRIVILEGES;
