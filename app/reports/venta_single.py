@@ -123,7 +123,7 @@ def generar_comprobante_venta(db: Session, venta_id: int):
     impuesto_monto = subtotal_total * (venta.impuesto or 0) / 100
     it_monto = subtotal_total * (venta.it or 0) / 100
     descuento_monto = subtotal_total * (venta.descuento or 0) / 100
-    total = subtotal_total + impuesto_monto + it_monto - descuento_monto
+    total = subtotal_total - descuento_monto
 
     table = Table(data, colWidths=[0.4*inch, 0.8*inch, 2.6*inch, 0.6*inch, 1.0*inch, 1.0*inch])
     table.setStyle(TableStyle([
@@ -145,40 +145,48 @@ def generar_comprobante_venta(db: Session, venta_id: int):
     styles.add(ParagraphStyle(name='TotLabel', parent=styles['Normal'], fontSize=10, leading=14, alignment=2))
     styles.add(ParagraphStyle(name='TotValue', parent=styles['Normal'], fontSize=10, leading=14, alignment=2))
     styles.add(ParagraphStyle(name='TotTotal', parent=styles['Normal'], fontSize=12, leading=16, fontName='Helvetica-Bold', alignment=2, textColor=colors.white))
+    styles.add(ParagraphStyle(name='TotRef', parent=styles['Normal'], fontSize=9, leading=13, alignment=2, textColor=colors.HexColor('#808080')))
 
-    tot_rows = [
-        [Paragraph('SUBTOTAL', styles['TotLabel']), Paragraph(f"Bs. {subtotal_total:.2f}", styles['TotValue'])],
-    ]
-    if (venta.impuesto or 0) > 0:
-        tot_rows.append([
-            Paragraph(f'IVA ({venta.impuesto}%)', styles['TotLabel']),
-            Paragraph(f"Bs. {impuesto_monto:.2f}", styles['TotValue']),
-        ])
-    if (venta.it or 0) > 0:
-        tot_rows.append([
-            Paragraph(f'IT ({venta.it}%)', styles['TotLabel']),
-            Paragraph(f"Bs. {it_monto:.2f}", styles['TotValue']),
-        ])
+    tot_rows = []
     if (venta.descuento or 0) > 0:
+        tot_rows.append([
+            Paragraph('SUBTOTAL', styles['TotLabel']),
+            Paragraph(f"Bs. {subtotal_total:.2f}", styles['TotValue']),
+        ])
         tot_rows.append([
             Paragraph(f'DESCUENTO ({venta.descuento}%)', styles['TotLabel']),
             Paragraph(f"- Bs. {descuento_monto:.2f}", styles['TotValue']),
         ])
+    total_idx = len(tot_rows)
     tot_rows.append([
         Paragraph('TOTAL', styles['TotTotal']),
         Paragraph(f"Bs. {total:.2f}", styles['TotTotal']),
     ])
+    if (venta.impuesto or 0) > 0:
+        tot_rows.append([
+            Paragraph(f'IVA ({venta.impuesto}%)', styles['TotRef']),
+            Paragraph(f"Bs. {impuesto_monto:.2f}", styles['TotRef']),
+        ])
+    if (venta.it or 0) > 0:
+        tot_rows.append([
+            Paragraph(f'IT ({venta.it}%)', styles['TotRef']),
+            Paragraph(f"Bs. {it_monto:.2f}", styles['TotRef']),
+        ])
 
     totals_table = Table(tot_rows, colWidths=[2.2*inch, 1.6*inch])
-    totals_table.setStyle(TableStyle([
+    tc = [
         ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('TOPPADDING', (0, 0), (-1, -1), 5),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LINEBELOW', (0, 0), (-1, -2), 0.5, colors.grey),
-        ('BACKGROUND', (0, -1), (-1, -1), secondary),
-        ('ROWBACKGROUNDS', (0, 0), (-1, -2), [colors.white, colors.HexColor('#f9f9f9')]),
-    ]))
+        ('BACKGROUND', (0, total_idx), (-1, total_idx), secondary),
+    ]
+    if total_idx > 0:
+        tc.append(('LINEBELOW', (0, 0), (-1, total_idx - 1), 0.5, colors.grey))
+        tc.append(('ROWBACKGROUNDS', (0, 0), (-1, total_idx - 1), [colors.white, colors.HexColor('#f9f9f9')]))
+    if total_idx + 1 <= len(tot_rows) - 1:
+        tc.append(('LINEBELOW', (0, total_idx), (-1, total_idx), 0.5, colors.grey))
+    totals_table.setStyle(TableStyle(tc))
 
     total_wrap = Table([[Paragraph('', styles['TotLabel']), totals_table]], colWidths=[2.2*inch, 3.8*inch])
     total_wrap.setStyle(TableStyle([

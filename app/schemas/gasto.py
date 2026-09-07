@@ -32,7 +32,7 @@ class GastoResponse(BaseModel):
     activo: bool
     usuario_id: int
     usuario_username: str = ""
-    fecha_registro: datetime
+    fecha_registro: Optional[datetime] = None
 
     class Config:
         from_attributes = True

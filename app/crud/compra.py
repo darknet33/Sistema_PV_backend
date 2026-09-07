@@ -35,7 +35,7 @@ def _update_stock(db: Session, producto_id: int, cantidad: int, sumar: bool):
         if sumar:
             producto.stock_actual = (producto.stock_actual or 0) + cantidad
         else:
-            producto.stock_actual = max(0, (producto.stock_actual or 0) - cantidad)
+            producto.stock_actual = (producto.stock_actual or 0) - cantidad
 
 def _build_response(db: Session, compra: Compra):
     proveedor = db.query(Proveedor).filter(Proveedor.id == compra.proveedor_id).first()
@@ -189,6 +189,19 @@ def _get_estado_anulado(db: Session):
         db.flush()
     return estado
 
+def _validar_stock_para_anular_compra(db: Session, detalles: list):
+    for d in detalles:
+        producto = db.query(Producto).filter(Producto.id == d.producto_id).first()
+        if not producto:
+            raise HTTPException(status_code=400, detail=f"Producto {d.producto_id} no existe")
+        stock = (producto.stock_actual or 0)
+        if stock - d.cantidad < 0:
+            nombre = producto.descripcion or producto.codigo
+            raise HTTPException(
+                status_code=400,
+                detail=f"No se puede anular la compra: stock insuficiente para '{nombre}'"
+            )
+
 def anular_compra(db: Session, compra_id: int):
     db_compra = db.query(Compra).filter(Compra.id == compra_id).first()
     if not db_compra:
@@ -199,6 +212,7 @@ def anular_compra(db: Session, compra_id: int):
         raise HTTPException(status_code=400, detail="La compra ya está anulada")
 
     detalles = db.query(CompraDetalle).filter(CompraDetalle.compra_id == compra_id).all()
+    _validar_stock_para_anular_compra(db, detalles)
     for d in detalles:
         _update_stock(db, d.producto_id, d.cantidad, sumar=False)
 
@@ -216,10 +230,6 @@ def delete_compra(db: Session, compra_id: int):
     estado_anulado = _get_estado_anulado(db)
     if db_compra.estado_id != estado_anulado.id:
         raise HTTPException(status_code=400, detail="Solo se puede eliminar compras anuladas")
-
-    detalles = db.query(CompraDetalle).filter(CompraDetalle.compra_id == compra_id).all()
-    for d in detalles:
-        _update_stock(db, d.producto_id, d.cantidad, sumar=False)
 
     db.query(CompraDetalle).filter(CompraDetalle.compra_id == compra_id).delete()
     db.delete(db_compra)

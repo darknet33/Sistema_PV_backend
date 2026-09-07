@@ -91,7 +91,7 @@ All routers use prefix `/api` (defined in `app/api/__init__.py`).
   - Título dinámico con el tipo de comprobante registrado (ej. `NOTA DE VENTA`); fallback `Comprobante de Venta`
   - `N° de Comprobante` mostrado de forma separada y discreta: alineado a la derecha bajo el título, negrita tamaño ~13 (`venta.num_comprobante`, fallback `venta.id`)
   - En los datos solo aparece `Incluye IVA X%` si `impuesto > 0` (oculto si es 0)
-  - Los totales van en un bloque separado **Resumen** alineado a la derecha: SUBTOTAL, IVA (X%) solo si > 0, DESCUENTO (X%) solo si > 0 y TOTAL resaltado con el color secundario de la empresa
+  - Los totales van en un bloque separado **Resumen** alineado a la derecha: SUBTOTAL y DESCUENTO (X%) solo si > 0, TOTAL resaltado con el color secundario de la empresa, e IVA (X%) / IT (X%) **debajo del TOTAL en gris (#808080)** como referencia solo si > 0
 
 ### WebSocket
 - Endpoint: `ws://host/api/ws/{room}` at `app/api/ws.py`
@@ -137,7 +137,7 @@ All routers use prefix `/api` (defined in `app/api/__init__.py`).
 - **Estado "ANULADO"**: Created automatically if missing; searched by name in uppercase
 - **Usuario**: Producto, Compra y Venta responses incluyen `usuario_username` (username del usuario que registró)
 - **Compra PDF columns**: `#`, Código, Producto (Categoría - Descripción), Cant., Costo (Bs.), Subtotal (Bs.)
-- **Venta PDF columns**: `#`, Código, Producto (Categoría - Descripción), Cant., Precio (Bs.), Subtotal (Bs.) — los totales NO van en la tabla; se agrupan en el bloque `Resumen` (SUBTOTAL / IVA (X%) / DESCUENTO (X%) / TOTAL)
+- **Venta PDF columns**: `#`, Código, Producto (Categoría - Descripción), Cant., Precio (Bs.), Subtotal (Bs.) — los totales NO van en la tabla; se agrupan en el bloque `Resumen` (SUBTOTAL / DESCUENTO (X%) / TOTAL resaltado, con IVA (X%) e IT (X%) debajo del TOTAL en gris como referencia)
 
 ---
 

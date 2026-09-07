@@ -29,10 +29,13 @@ def _q(value) -> Decimal:
     return Decimal(value or 0).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def _precio_venta(costo: Decimal, utilidad_pct: Decimal) -> Decimal:
+def _precio_venta(costo: Decimal, utilidad_pct: Decimal, con_factura: bool = False) -> Decimal:
     costo = Decimal(costo or 0)
     pct = Decimal(utilidad_pct or 0)
-    return _q(costo + (costo * pct / 100))
+    precio = costo + (costo * pct / 100)
+    if con_factura:
+        precio = precio * (Decimal("1") + IVA_RATE / 100) * (Decimal("1") + IT_RATE / 100)
+    return _q(precio)
 
 
 def _marcar_vencidas(db: Session):
@@ -209,7 +212,7 @@ def _calcular_totales(cot, con_factura: bool):
     iva = _q(subtotal * IVA_RATE / 100) if con_factura else Decimal("0.00")
     it = _q(subtotal * IT_RATE / 100) if con_factura else Decimal("0.00")
     descuento_monto = _q(subtotal * (cot.descuento or 0) / 100)
-    total = _q(subtotal + iva + it - descuento_monto)
+    total = _q(subtotal - descuento_monto)
     return subtotal, iva, it, descuento_monto, total
 
 
@@ -271,7 +274,7 @@ def create_cotizacion(db: Session, cot: CotizacionCreate, usuario_id: int):
             cantidad=Decimal(detalle.cantidad),
             costo=costo_por_unidad,
             utilidad_pct=_q(detalle.utilidad_pct),
-            precio_venta=_precio_venta(costo_por_unidad, detalle.utilidad_pct),
+            precio_venta=_precio_venta(costo_por_unidad, detalle.utilidad_pct, bool(cot.con_factura)),
         )
         db.add(db_detalle)
 
@@ -335,7 +338,7 @@ def update_cotizacion(db: Session, cotizacion_id: int, cot: CotizacionUpdate):
                 cantidad=Decimal(detalle.cantidad),
                 costo=costo_por_unidad,
                 utilidad_pct=_q(detalle.utilidad_pct),
-                precio_venta=_precio_venta(costo_por_unidad, detalle.utilidad_pct),
+                precio_venta=_precio_venta(costo_por_unidad, detalle.utilidad_pct, bool(db_cot.con_factura)),
             )
             db.add(db_detalle)
 
@@ -428,8 +431,24 @@ def convertir_en_venta(db: Session, cotizacion_id: int, payload: ConvertirVentaR
         it = IT_RATE if bool(db_cot.con_factura) else Decimal("0")
         descuento = _q(db_cot.descuento or Decimal("0"))
 
-        subtotal = sum(Decimal(d.cantidad) * Decimal(d.precio_venta) for d in detalles)
-        total = _q(subtotal + (subtotal * impuesto / 100) + (subtotal * it / 100) - (subtotal * descuento / 100))
+        # El stock y los montos se gestionan SIEMPRE en la unidad principal:
+        #   cantidad_principal = cantidad (en su unidad) * factor  -> nro de unidades principales
+        #   precio por unidad principal = precio_venta (de la cotización, ya calculado) / factor
+        # El total de la venta se calcula desde las líneas convertidas (precios preservados),
+        # SIN volver a aplicar la fórmula compuesta de IVA/IT.
+        converted = []
+        subtotal = Decimal("0")
+        for d in detalles:
+            uinfo = _get_unidad_info(db, d.producto_id, d.unidad_id)
+            factor = uinfo["factor"]
+            cantidad_principal = _q(Decimal(d.cantidad) * factor) if factor > 0 else Decimal(d.cantidad)
+            precio_venta_principal = _q(Decimal(d.precio_venta) / factor) if factor > 0 else Decimal(d.precio_venta)
+            utilidad = _q(Decimal(d.costo) * Decimal(d.utilidad_pct) / 100)
+            converted.append((d, cantidad_principal, precio_venta_principal, utilidad))
+            subtotal += _q(int(cantidad_principal) * precio_venta_principal)
+
+        subtotal = _q(subtotal)
+        total = _q(subtotal - _q(subtotal * descuento / 100))
 
         db_venta = Venta(
             fecha=datetime.combine(db_cot.fecha.date(), datetime.now().time()),
@@ -447,15 +466,7 @@ def convertir_en_venta(db: Session, cotizacion_id: int, payload: ConvertirVentaR
         db.add(db_venta)
         db.flush()
 
-        for d in detalles:
-            uinfo = _get_unidad_info(db, d.producto_id, d.unidad_id)
-            factor = uinfo["factor"]
-            # El stock se gestiona SIEMPRE en la unidad principal:
-            #   cantidad_principal = cantidad (en su unidad) * factor  -> nro de unidades principales
-            #   precio por unidad principal = precio_venta (de la línea) / factor
-            cantidad_principal = _q(Decimal(d.cantidad) * factor) if factor > 0 else Decimal(d.cantidad)
-            precio_venta_principal = _q(Decimal(d.precio_venta) / factor) if factor > 0 else Decimal(d.precio_venta)
-            utilidad = _q(Decimal(d.costo) * Decimal(d.utilidad_pct) / 100)
+        for d, cantidad_principal, precio_venta_principal, utilidad in converted:
             db_detalle = VentaDetalle(
                 venta_id=db_venta.id,
                 producto_id=d.producto_id,

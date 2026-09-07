@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, selectinload
 from fastapi import HTTPException
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, date
 from app.models.venta import Venta
 from app.models.venta_detalle import VentaDetalle
@@ -11,6 +11,18 @@ from app.models.estado import Estado
 from app.models.usuario import Usuario
 from app.models.cotizacion import Cotizacion
 from app.schemas.venta import VentaCreate, VentaUpdate
+
+IVA_RATE = Decimal("13")
+IT_RATE = Decimal("3")
+
+def _q(value) -> Decimal:
+    return Decimal(value or 0).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+def _precio_item(precio: Decimal, impuesto: Decimal) -> Decimal:
+    precio = Decimal(precio or 0)
+    if (impuesto or 0) > 0:
+        return _q(precio * (Decimal("1") + IVA_RATE / 100) * (Decimal("1") + IT_RATE / 100))
+    return _q(precio)
 
 def _validate_foreign_keys(db: Session, cliente_id: int, comprobante_id: int, estado_id: int, detalles: list):
     cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
@@ -56,7 +68,7 @@ def _update_stock(db: Session, producto_id: int, cantidad: int, sumar: bool):
         if sumar:
             producto.stock_actual = (producto.stock_actual or 0) + cantidad
         else:
-            producto.stock_actual = max(0, (producto.stock_actual or 0) - cantidad)
+            producto.stock_actual = (producto.stock_actual or 0) - cantidad
 
 def _build_response(db: Session, venta: Venta):
     cliente = db.query(Cliente).filter(Cliente.id == venta.cliente_id).first()
@@ -124,11 +136,19 @@ def create_venta(db: Session, venta: VentaCreate, usuario_id: int):
     _validate_foreign_keys(db, venta.cliente_id, venta.comprobante_id, venta.estado_id, venta.detalles)
     _validar_stock_para_venta(db, venta.detalles)
 
-    subtotal = sum(d.cantidad * d.precio for d in venta.detalles)
     impuesto = Decimal(venta.impuesto or 0)
     it = Decimal(getattr(venta, 'it', 0) or 0)
     descuento = Decimal(venta.descuento or 0)
-    total = subtotal + (subtotal * impuesto / 100) + (subtotal * it / 100) - (subtotal * descuento / 100)
+
+    subtotal = Decimal("0")
+    precios_final = []
+    for detalle in venta.detalles:
+        precio_final = _precio_item(detalle.precio, impuesto)
+        precios_final.append(precio_final)
+        subtotal += Decimal(detalle.cantidad) * precio_final
+    subtotal = _q(subtotal)
+    descuento_monto = _q(subtotal * descuento / 100)
+    total = _q(subtotal - descuento_monto)
 
     if getattr(venta, 'automatico', True):
         comprobante = db.query(Comprobante).filter(Comprobante.id == venta.comprobante_id).with_for_update().first()
@@ -156,12 +176,12 @@ def create_venta(db: Session, venta: VentaCreate, usuario_id: int):
     db.add(db_venta)
     db.flush()
 
-    for detalle in venta.detalles:
+    for detalle, precio_final in zip(venta.detalles, precios_final):
         db_detalle = VentaDetalle(
             venta_id=db_venta.id,
             producto_id=detalle.producto_id,
             cantidad=detalle.cantidad,
-            precio=detalle.precio,
+            precio=precio_final,
             utilidad=detalle.utilidad or 0
         )
         db.add(db_detalle)
@@ -210,28 +230,32 @@ def update_venta(db: Session, venta_id: int, venta: VentaUpdate):
             _update_stock(db, old_d.producto_id, old_d.cantidad, sumar=True)
         db.query(VentaDetalle).filter(VentaDetalle.venta_id == venta_id).delete()
 
-        subtotal = sum(d.cantidad * d.precio for d in detalles_data)
         impuesto = Decimal(db_venta.impuesto or 0)
-        it = Decimal(db_venta.it or 0)
         descuento = Decimal(db_venta.descuento or 0)
-        db_venta.total = subtotal + (subtotal * impuesto / 100) + (subtotal * it / 100) - (subtotal * descuento / 100)
 
+        subtotal = Decimal("0")
+        precios_final = []
         for detalle in detalles_data:
+            precio_final = _precio_item(detalle.precio, impuesto)
+            precios_final.append(precio_final)
+            subtotal += Decimal(detalle.cantidad) * precio_final
+        subtotal = _q(subtotal)
+        db_venta.total = _q(subtotal - _q(subtotal * descuento / 100))
+
+        for detalle, precio_final in zip(detalles_data, precios_final):
             db_detalle = VentaDetalle(
                 venta_id=venta_id,
                 producto_id=detalle.producto_id,
                 cantidad=detalle.cantidad,
-                precio=detalle.precio,
+                precio=precio_final,
                 utilidad=detalle.utilidad or 0
             )
             db.add(db_detalle)
             _update_stock(db, detalle.producto_id, detalle.cantidad, sumar=False)
     else:
-        subtotal = sum(d.cantidad * d.precio for d in db.query(VentaDetalle).filter(VentaDetalle.venta_id == venta_id).all())
-        impuesto = Decimal(db_venta.impuesto or 0)
-        it = Decimal(db_venta.it or 0)
+        subtotal = _q(sum(Decimal(d.cantidad) * Decimal(d.precio) for d in db.query(VentaDetalle).filter(VentaDetalle.venta_id == venta_id).all()))
         descuento = Decimal(db_venta.descuento or 0)
-        db_venta.total = subtotal + (subtotal * impuesto / 100) + (subtotal * it / 100) - (subtotal * descuento / 100)
+        db_venta.total = _q(subtotal - _q(subtotal * descuento / 100))
 
     db.commit()
     db.refresh(db_venta)

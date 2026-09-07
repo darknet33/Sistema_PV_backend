@@ -66,6 +66,7 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
     styles.add(ParagraphStyle(name='CellWrap', parent=styles['Normal'], fontSize=9, leading=12, wordWrap='CJK'))
     styles.add(ParagraphStyle(name='CellCenter', parent=styles['Normal'], fontSize=9, leading=12, alignment=1))
     styles.add(ParagraphStyle(name='CellRight', parent=styles['Normal'], fontSize=9, leading=12, alignment=2))
+    styles.add(ParagraphStyle(name='CellRef', parent=styles['Normal'], fontSize=8, leading=12, alignment=2, textColor=colors.HexColor('#808080')))
     styles.add(ParagraphStyle(name='HeaderCell', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.white, fontName='Helvetica-Bold', alignment=1))
     styles.add(ParagraphStyle(name='TermTitle', parent=styles['Normal'], fontSize=10, leading=13, fontName='Helvetica-Bold'))
     styles.add(ParagraphStyle(name='TermBody', parent=styles['Normal'], fontSize=9, leading=12, wordWrap='CJK'))
@@ -159,37 +160,16 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         ]
         data.append(row)
 
-    data.append([
-        Paragraph('', styles['CellCenter']),
-        Paragraph('', styles['CellWrap']),
-        Paragraph('', styles['CellWrap']),
-        Paragraph('', styles['CellCenter']),
-        Paragraph('', styles['CellCenter']),
-        Paragraph('SUBTOTAL:', styles['CellRight']),
-        Paragraph(f"Bs. {cot.subtotal:.2f}", styles['CellRight']),
-    ])
-
-    if cot.con_factura:
-        data.append([
-            Paragraph('', styles['CellCenter']),
-            Paragraph('', styles['CellWrap']),
-            Paragraph('', styles['CellWrap']),
-            Paragraph('', styles['CellCenter']),
-            Paragraph('', styles['CellCenter']),
-            Paragraph('IVA (13%):', styles['CellRight']),
-            Paragraph(f"Bs. {cot.iva:.2f}", styles['CellRight']),
-        ])
-        data.append([
-            Paragraph('', styles['CellCenter']),
-            Paragraph('', styles['CellWrap']),
-            Paragraph('', styles['CellWrap']),
-            Paragraph('', styles['CellCenter']),
-            Paragraph('', styles['CellCenter']),
-            Paragraph('IT (3%):', styles['CellRight']),
-            Paragraph(f"Bs. {cot.it:.2f}", styles['CellRight']),
-        ])
-
     if (cot.descuento or 0) > 0:
+        data.append([
+            Paragraph('', styles['CellCenter']),
+            Paragraph('', styles['CellWrap']),
+            Paragraph('', styles['CellWrap']),
+            Paragraph('', styles['CellCenter']),
+            Paragraph('', styles['CellCenter']),
+            Paragraph('SUBTOTAL:', styles['CellRight']),
+            Paragraph(f"Bs. {cot.subtotal:.2f}", styles['CellRight']),
+        ])
         descuento_monto = cot.subtotal * cot.descuento / 100
         data.append([
             Paragraph('', styles['CellCenter']),
@@ -201,6 +181,8 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
             Paragraph(f"- Bs. {descuento_monto:.2f}", styles['CellRight']),
         ])
 
+    total_row_idx = len(data)
+
     data.append([
         Paragraph('', styles['CellCenter']),
         Paragraph('', styles['CellWrap']),
@@ -211,27 +193,51 @@ def generar_pdf_cotizacion(db: Session, cotizacion_id: int):
         Paragraph(f"Bs. {cot.total:.2f}", styles['CellRight']),
     ])
 
+    if cot.con_factura:
+        data.append([
+            Paragraph('', styles['CellCenter']),
+            Paragraph('', styles['CellWrap']),
+            Paragraph('', styles['CellWrap']),
+            Paragraph('', styles['CellCenter']),
+            Paragraph('', styles['CellCenter']),
+            Paragraph('IVA (13%):', styles['CellRef']),
+            Paragraph(f"Bs. {cot.iva:.2f}", styles['CellRef']),
+        ])
+        data.append([
+            Paragraph('', styles['CellCenter']),
+            Paragraph('', styles['CellWrap']),
+            Paragraph('', styles['CellWrap']),
+            Paragraph('', styles['CellCenter']),
+            Paragraph('', styles['CellCenter']),
+            Paragraph('IT (3%):', styles['CellRef']),
+            Paragraph(f"Bs. {cot.it:.2f}", styles['CellRef']),
+        ])
+
     primary, secondary = empresa_colors(db)
 
     col_widths = [0.35 * inch, 0.7 * inch, 2.55 * inch, 1.25 * inch, 0.5 * inch, 0.95 * inch, 1.0 * inch]
 
     table = Table(data, colWidths=col_widths)
-    table.setStyle(TableStyle([
+    tp = [
         ('BACKGROUND', (0, 0), (-1, 0), secondary),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('ALIGN', (1, 1), (2, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -2), 0.5, colors.grey),
-        ('LINEBELOW', (5, -1), (-1, -1), 1, colors.black),
-        ('FONTNAME', (5, -1), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (5, -1), (-1, -1), 10),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f0f0f0')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#f9f9f9')]),
+        ('FONTSIZE', (0, 1), (-1, total_row_idx), 8),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
+        ('BACKGROUND', (0, total_row_idx), (-1, total_row_idx), colors.HexColor('#f0f0f0')),
+        ('FONTNAME', (5, total_row_idx), (-1, total_row_idx), 'Helvetica-Bold'),
+        ('FONTSIZE', (5, total_row_idx), (-1, total_row_idx), 10),
+        ('LINEBELOW', (5, total_row_idx), (-1, total_row_idx), 1, colors.black),
+    ]
+    if total_row_idx >= 2:
+        tp.extend([
+            ('GRID', (0, 0), (-1, total_row_idx - 1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, total_row_idx - 1), [colors.white, colors.HexColor('#f9f9f9')]),
+        ])
+    table.setStyle(TableStyle(tp))
 
     elements.append(table)
     elements.append(Spacer(1, 16))

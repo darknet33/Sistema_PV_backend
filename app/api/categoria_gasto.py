@@ -4,6 +4,7 @@ from typing import List
 from app.database import get_db
 from app.schemas.categoria_gasto import CategoriaGastoCreate, CategoriaGastoResponse
 from app.crud.categoria_gasto import get_categorias_gastos, get_categoria_gasto, create_categoria_gasto, update_categoria_gasto, delete_categoria_gasto
+from app.ws import broadcast_multiple_sync
 
 router = APIRouter()
 
@@ -20,13 +21,16 @@ def read_categoria_gasto(categoria_id: int, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=CategoriaGastoResponse)
 def create_categoria_gasto_endpoint(categoria: CategoriaGastoCreate, db: Session = Depends(get_db)):
-    return create_categoria_gasto(db, categoria)
+    result = create_categoria_gasto(db, categoria)
+    broadcast_multiple_sync(["gastos", "dashboard", "reportes"], {"type": "created", "room": "gastos"})
+    return result
 
 @router.put("/{categoria_id}", response_model=CategoriaGastoResponse)
 def update_categoria_gasto_endpoint(categoria_id: int, categoria: CategoriaGastoCreate, db: Session = Depends(get_db)):
     db_categoria = update_categoria_gasto(db, categoria_id, categoria)
     if not db_categoria:
         raise HTTPException(status_code=404, detail="Categoría de gasto not found")
+    broadcast_multiple_sync(["gastos", "dashboard", "reportes"], {"type": "updated", "room": "gastos"})
     return db_categoria
 
 @router.delete("/{categoria_id}")
@@ -34,4 +38,5 @@ def delete_categoria_gasto_endpoint(categoria_id: int, db: Session = Depends(get
     db_categoria = delete_categoria_gasto(db, categoria_id)
     if not db_categoria:
         raise HTTPException(status_code=404, detail="Categoría de gasto not found")
+    broadcast_multiple_sync(["gastos", "dashboard", "reportes"], {"type": "deleted", "room": "gastos"})
     return {"message": "Categoría de gasto deleted"}
