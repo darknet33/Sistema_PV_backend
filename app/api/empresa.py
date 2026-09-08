@@ -16,6 +16,26 @@ UPLOAD_DIR = BASE_DIR / "uploads" / "empresa"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 
+def _generar_derivados_logo(contents: bytes):
+    """Genera favicon.ico y los íconos PWA (192/512) a partir del logo subido."""
+    try:
+        img = Image.open(BytesIO(contents)).convert("RGBA")
+
+        icono = img.copy()
+        icono.thumbnail((48, 48), Image.LANCZOS)
+        icono.save(UPLOAD_DIR / "favicon.ico", format="ICO", sizes=[(16, 16), (32, 32), (48, 48)])
+
+        for size in (192, 512):
+            canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+            cuadrada = img.copy()
+            cuadrada.thumbnail((size, size), Image.LANCZOS)
+            offset = ((size - cuadrada.width) // 2, (size - cuadrada.height) // 2)
+            canvas.paste(cuadrada, offset, cuadrada)
+            canvas.save(UPLOAD_DIR / f"logo-{size}.png", format="PNG")
+    except Exception:
+        pass
+
+
 def _default_response():
     return {
         "id": 1,
@@ -74,6 +94,10 @@ async def _guardar_imagen(db: Session, file: UploadFile, prefijo: str, campo: st
     setattr(db_empresa, campo, url)
     db.commit()
     db.refresh(db_empresa)
+
+    if prefijo == "logo":
+        _generar_derivados_logo(contents)
+
     return url
 
 
@@ -87,6 +111,14 @@ def _eliminar_imagen(db: Session, campo: str):
                 old_path.unlink()
         except Exception:
             pass
+        if campo == "logo":
+            for derivado in ("favicon.ico", "logo-192.png", "logo-512.png"):
+                try:
+                    derivado_path = UPLOAD_DIR / derivado
+                    if derivado_path.exists():
+                        derivado_path.unlink()
+                except Exception:
+                    pass
         setattr(db_empresa, campo, None)
         db.commit()
         db.refresh(db_empresa)
