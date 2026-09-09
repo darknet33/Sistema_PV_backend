@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models.unidad_medida import UnidadMedida
 from app.schemas.unidad_medida import UnidadMedidaCreate
+from app.utils import capitalizar
 
 
 def get_unidad_medida(db: Session, uid: int):
@@ -17,7 +18,7 @@ def get_unidades_medida(db: Session, categoria_id: int = None, skip: int = 0, li
 
 def create_unidad_medida(db: Session, data: UnidadMedidaCreate):
     db_obj = UnidadMedida(
-        nombre=data.nombre,
+        nombre=capitalizar(data.nombre),
         abreviatura=data.abreviatura,
         categoria_unidad_id=data.categoria_unidad_id,
     )
@@ -31,7 +32,7 @@ def update_unidad_medida(db: Session, uid: int, data: UnidadMedidaCreate):
     db_obj = get_unidad_medida(db, uid)
     if not db_obj:
         return None
-    db_obj.nombre = data.nombre
+    db_obj.nombre = capitalizar(data.nombre)
     db_obj.abreviatura = data.abreviatura
     db_obj.categoria_unidad_id = data.categoria_unidad_id
     db.commit()

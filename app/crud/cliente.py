@@ -17,7 +17,7 @@ def create_cliente(db: Session, cliente: ClienteCreate):
         nombre=capitalizar(cliente.nombre),
         nit=cliente.nit,
         celular=cliente.celular,
-        direccion=cliente.direccion
+        direccion=capitalizar(cliente.direccion)
     )
     db.add(db_cliente)
     db.commit()
@@ -30,7 +30,7 @@ def update_cliente(db: Session, cliente_id: int, cliente: ClienteCreate):
         db_cliente.nombre = capitalizar(cliente.nombre)
         db_cliente.nit = cliente.nit
         db_cliente.celular = cliente.celular
-        db_cliente.direccion = cliente.direccion
+        db_cliente.direccion = capitalizar(cliente.direccion)
         db.commit()
         db.refresh(db_cliente)
     return db_cliente

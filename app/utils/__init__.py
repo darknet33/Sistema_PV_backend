@@ -7,3 +7,9 @@ def capitalizar(texto: Optional[str]) -> Optional[str]:
     if not texto:
         return texto
     return " ".join(palabra.capitalize() for palabra in texto.strip().split())
+
+
+def a_mayusculas(texto: Optional[str]) -> Optional[str]:
+    if not texto:
+        return texto
+    return " ".join(texto.strip().upper().split())

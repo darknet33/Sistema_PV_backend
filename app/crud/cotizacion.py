@@ -16,6 +16,7 @@ from app.models.venta_detalle import VentaDetalle
 from app.models.producto_unidad import ProductoUnidad
 from app.models.unidad_medida import UnidadMedida
 from app.schemas.cotizacion import CotizacionCreate, CotizacionUpdate, ConvertirVentaRequest
+from app.utils import capitalizar, a_mayusculas
 from app.crud.venta import _validar_stock_para_venta, _update_stock
 
 IVA_RATE = Decimal("13")
@@ -248,17 +249,17 @@ def create_cotizacion(db: Session, cot: CotizacionCreate, usuario_id: int):
         estado=ESTADO_ENVIADO,
         con_factura=bool(cot.con_factura),
         incluir_imagenes=bool(cot.incluir_imagenes),
-        modalidad_pago=cot.modalidad_pago or "",
+        modalidad_pago=capitalizar(cot.modalidad_pago or ""),
         forma_pago=cot.forma_pago or "",
         validez_dias=int(cot.validez_dias or 15),
-        terminos_condiciones=cot.terminos_condiciones or "",
+        terminos_condiciones=capitalizar(cot.terminos_condiciones or ""),
         descuento=_q(cot.descuento),
         usuario_id=usuario_id,
         activo=True,
-        cliente_razon_social=cliente.nombre if cliente else "",
+        cliente_razon_social=a_mayusculas(cliente.nombre) if cliente else "",
         cliente_nit=cliente.nit if cliente else "",
         cliente_celular=cliente.celular if cliente else "",
-        cliente_direccion=cliente.direccion if cliente else "",
+        cliente_direccion=capitalizar(cliente.direccion) if cliente else "",
     )
     db.add(db_cot)
     db.flush()
@@ -304,16 +305,16 @@ def update_cotizacion(db: Session, cotizacion_id: int, cot: CotizacionUpdate):
         db_cot.cliente_id = cot.cliente_id
         cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
         if cliente:
-            db_cot.cliente_razon_social = cliente.nombre
+            db_cot.cliente_razon_social = a_mayusculas(cliente.nombre)
             db_cot.cliente_nit = cliente.nit
             db_cot.cliente_celular = cliente.celular
-            db_cot.cliente_direccion = cliente.direccion
+            db_cot.cliente_direccion = capitalizar(cliente.direccion)
     if cot.con_factura is not None:
         db_cot.con_factura = bool(cot.con_factura)
     if cot.incluir_imagenes is not None:
         db_cot.incluir_imagenes = bool(cot.incluir_imagenes)
     if cot.modalidad_pago is not None:
-        db_cot.modalidad_pago = cot.modalidad_pago
+        db_cot.modalidad_pago = capitalizar(cot.modalidad_pago)
     if cot.forma_pago is not None:
         db_cot.forma_pago = cot.forma_pago
     if cot.descuento is not None:
@@ -322,7 +323,7 @@ def update_cotizacion(db: Session, cotizacion_id: int, cot: CotizacionUpdate):
         db_cot.validez_dias = int(cot.validez_dias)
         db_cot.fecha_vencimiento = db_cot.fecha + timedelta(days=int(cot.validez_dias))
     if cot.terminos_condiciones is not None:
-        db_cot.terminos_condiciones = cot.terminos_condiciones
+        db_cot.terminos_condiciones = capitalizar(cot.terminos_condiciones)
 
     if cot.detalles is not None:
         if not cot.detalles:

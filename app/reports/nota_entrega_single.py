@@ -51,7 +51,9 @@ def generar_pdf_nota_entrega(db: Session, nota_id: int):
     styles.add(ParagraphStyle(name='CellRight', parent=styles['Normal'], fontSize=9, leading=12, alignment=2))
     styles.add(ParagraphStyle(name='HeaderCell', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.white, fontName='Helvetica-Bold', alignment=1))
     styles.add(ParagraphStyle(name='FirmaTitle', parent=styles['Normal'], fontSize=11, leading=14, fontName='Helvetica-Bold', alignment=1, textColor=secondary))
-    styles.add(ParagraphStyle(name='FirmaBody', parent=styles['Normal'], fontSize=10, leading=15))
+    styles.add(ParagraphStyle(name='FirmaBody', parent=styles['Normal'], fontSize=9, leading=12, alignment=1))
+    styles.add(ParagraphStyle(name='FirmaLine', parent=styles['Normal'], fontSize=8, leading=9, fontName='Helvetica', alignment=1))
+    styles.add(ParagraphStyle(name='FirmaLabel', parent=styles['Normal'], fontSize=10, leading=13, fontName='Helvetica-Bold', alignment=1))
 
     def _esc(val):
         return escape(str(val)) if val not in (None, "") else "-"
@@ -153,12 +155,12 @@ def generar_pdf_nota_entrega(db: Session, nota_id: int):
     def firma_block(titulo, nombre, carnet):
         inner = Table([
             [Paragraph(titulo, styles['FirmaTitle'])],
+            [Spacer(1, 30)],
+            [Paragraph('_' * 34, styles['FirmaLine'])],
             [Spacer(1, 6)],
             [Paragraph(f"Nombre: {_esc(nombre)}", styles['FirmaBody'])],
-            [Paragraph(f"Carnet de identidad: {_esc(carnet)}", styles['FirmaBody'])],
-            [Spacer(1, 22)],
-            [Paragraph('_' * 46, styles['FirmaBody'])],
-            [Paragraph('Firma', styles['FirmaBody'])],
+            [Paragraph(f"C.I.: {_esc(carnet)}", styles['FirmaBody'])],
+            [Paragraph('Firma', styles['FirmaLabel'])],
         ], colWidths=[3.15 * inch])
         inner.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**Sistema Rhino** v3.0 — Backend API REST para sistema de inventario POS. FastAPI + SQLAlchemy + MySQL/MariaDB.
+**Sistema_Inventario** v3.0 — Backend API REST para sistema de inventario POS. FastAPI + SQLAlchemy + MySQL/MariaDB.
 
 ### Stack
 - FastAPI 0.115, SQLAlchemy 2.0, MySQL (PyMySQL), Pydantic v2

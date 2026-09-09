@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from app.database import get_db
 from app.schemas.nota_entrega import NotaEntregaCreate, NotaEntregaResponse
 from app.crud.nota_entrega import get_notas_entrega, get_nota_entrega, create_nota_entrega, delete_nota_entrega
+from app.auth import get_current_user_full
 
 router = APIRouter()
 
@@ -25,8 +26,8 @@ def read_nota_entrega(nota_id: int, db: Session = Depends(get_db)):
     return db_nota
 
 @router.post("/", response_model=NotaEntregaResponse)
-def create_nota_entrega_endpoint(nota: NotaEntregaCreate, db: Session = Depends(get_db)):
-    result = create_nota_entrega(db, nota, usuario_id=1)
+def create_nota_entrega_endpoint(nota: NotaEntregaCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user_full)):
+    result = create_nota_entrega(db, nota, usuario_id=current_user.id)
     return result
 
 @router.delete("/{nota_id}")

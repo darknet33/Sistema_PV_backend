@@ -19,6 +19,7 @@ class NotaEntregaDetalleResponse(BaseModel):
 
 class NotaEntregaCreate(BaseModel):
     venta_id: int
+    fecha: Optional[datetime] = None
     entregue_nombre: str
     entregue_carnet: str
     recibi_nombre: str

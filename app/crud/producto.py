@@ -7,6 +7,7 @@ from app.models.venta_detalle import VentaDetalle
 from app.models.cotizacion_detalle import CotizacionDetalle
 from app.models.nota_entrega import NotaEntregaDetalle
 from app.schemas.producto import ProductoCreate, ProductoUpdate
+from app.utils import capitalizar
 from app.crud.producto_unidad import (
     set_unidades_producto, get_unidades_producto, build_unidad_response, build_unidad_principal
 )
@@ -80,9 +81,9 @@ def create_producto(db: Session, producto: ProductoCreate, usuario_id: int = Non
     db_producto = Producto(
         codigo=producto.codigo,
         categoria_id=producto.categoria_id,
-        descripcion=producto.descripcion,
-        marca=producto.marca,
-        procedencia=producto.procedencia,
+        descripcion=capitalizar(producto.descripcion),
+        marca=capitalizar(producto.marca),
+        procedencia=capitalizar(producto.procedencia),
         precio=producto.precio,
         utilidad=producto.utilidad,
         stock_inicial=producto.stock_inicial,
@@ -109,6 +110,12 @@ def update_producto(db: Session, producto_id: int, producto: ProductoUpdate):
         return None
     for key, value in producto.model_dump(exclude_unset=True, exclude={"unidades"}).items():
         setattr(db_producto, key, value)
+    if "descripcion" in producto.model_fields_set and producto.descripcion is not None:
+        db_producto.descripcion = capitalizar(producto.descripcion)
+    if "marca" in producto.model_fields_set and producto.marca is not None:
+        db_producto.marca = capitalizar(producto.marca)
+    if "procedencia" in producto.model_fields_set and producto.procedencia is not None:
+        db_producto.procedencia = capitalizar(producto.procedencia)
     if producto.unidades is not None:
         set_unidades_producto(db, db_producto.id, producto.unidades)
     db.commit()

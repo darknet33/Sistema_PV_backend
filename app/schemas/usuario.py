@@ -12,6 +12,18 @@ class UsuarioBase(BaseModel):
 class UsuarioCreate(UsuarioBase):
     password: str
 
+class UsuarioUpdate(BaseModel):
+    username: Optional[str] = None
+    nombres: Optional[str] = None
+    apellidos: Optional[str] = None
+    cargo: Optional[str] = None
+    rol_id: Optional[int] = None
+    password: Optional[str] = None
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
 class UsuarioAdminSetup(BaseModel):
     username: str
     password: str

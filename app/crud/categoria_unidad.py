@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from app.models.categoria_unidad import CategoriaUnidad
 from app.models.unidad_medida import UnidadMedida
 from app.schemas.categoria_unidad import CategoriaUnidadCreate
+from app.utils import capitalizar
 
 
 def get_categoria_unidad(db: Session, cat_id: int):
@@ -14,7 +15,7 @@ def get_categorias_unidad(db: Session, skip: int = 0, limit: int = 10000):
 
 
 def create_categoria_unidad(db: Session, data: CategoriaUnidadCreate):
-    db_obj = CategoriaUnidad(nombre=data.nombre, descripcion=data.descripcion)
+    db_obj = CategoriaUnidad(nombre=capitalizar(data.nombre), descripcion=capitalizar(data.descripcion))
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)
@@ -25,8 +26,8 @@ def update_categoria_unidad(db: Session, cat_id: int, data: CategoriaUnidadCreat
     db_obj = get_categoria_unidad(db, cat_id)
     if not db_obj:
         return None
-    db_obj.nombre = data.nombre
-    db_obj.descripcion = data.descripcion
+    db_obj.nombre = capitalizar(data.nombre)
+    db_obj.descripcion = capitalizar(data.descripcion)
     db.commit()
     db.refresh(db_obj)
     return db_obj

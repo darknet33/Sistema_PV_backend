@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 from app.models.usuario import Usuario
-from app.schemas.usuario import UsuarioCreate
+from app.schemas.usuario import UsuarioCreate, UsuarioUpdate
 from app.auth import get_password_hash
+from app.utils import capitalizar
 
 def get_usuario(db: Session, usuario_id: int):
     return db.query(Usuario).filter(Usuario.id == usuario_id).first()
@@ -17,9 +18,9 @@ def create_usuario(db: Session, usuario: UsuarioCreate):
     db_usuario = Usuario(
         username=usuario.username,
         password=hashed_password,
-        nombres=usuario.nombres,
-        apellidos=usuario.apellidos,
-        cargo=usuario.cargo,
+        nombres=capitalizar(usuario.nombres),
+        apellidos=capitalizar(usuario.apellidos),
+        cargo=capitalizar(usuario.cargo),
         rol_id=usuario.rol_id
     )
     db.add(db_usuario)
@@ -27,15 +28,29 @@ def create_usuario(db: Session, usuario: UsuarioCreate):
     db.refresh(db_usuario)
     return db_usuario
 
-def update_usuario(db: Session, usuario_id: int, usuario: UsuarioCreate):
+def update_usuario(db: Session, usuario_id: int, usuario: UsuarioUpdate):
     db_usuario = get_usuario(db, usuario_id)
     if db_usuario:
-        db_usuario.username = usuario.username
-        db_usuario.password = get_password_hash(usuario.password)
-        db_usuario.nombres = usuario.nombres
-        db_usuario.apellidos = usuario.apellidos
-        db_usuario.cargo = usuario.cargo
-        db_usuario.rol_id = usuario.rol_id
+        if usuario.username is not None:
+            db_usuario.username = usuario.username
+        if usuario.password:
+            db_usuario.password = get_password_hash(usuario.password)
+        if usuario.nombres is not None:
+            db_usuario.nombres = capitalizar(usuario.nombres)
+        if usuario.apellidos is not None:
+            db_usuario.apellidos = capitalizar(usuario.apellidos)
+        if usuario.cargo is not None:
+            db_usuario.cargo = capitalizar(usuario.cargo)
+        if usuario.rol_id is not None:
+            db_usuario.rol_id = usuario.rol_id
+        db.commit()
+        db.refresh(db_usuario)
+    return db_usuario
+
+def change_password(db: Session, usuario_id: int, new_password: str):
+    db_usuario = get_usuario(db, usuario_id)
+    if db_usuario:
+        db_usuario.password = get_password_hash(new_password)
         db.commit()
         db.refresh(db_usuario)
     return db_usuario
